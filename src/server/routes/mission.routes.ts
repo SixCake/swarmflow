@@ -59,7 +59,12 @@ export function registerMissionRoutes(
       return
     }
 
-    missionManager.updateStatus(id, status as MissionStatus)
-    reply.send({ success: true, status })
+    try {
+      missionManager.updateStatus(id, status as MissionStatus)
+      reply.send({ success: true, status })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update status'
+      reply.code(400).send({ error: message })
+    }
   })
 }

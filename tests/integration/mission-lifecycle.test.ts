@@ -75,7 +75,7 @@ describe('Mission Lifecycle Integration', () => {
   beforeEach(() => {
     missionManager = new MissionManager()
     taskBoard = new TaskBoard()
-    dagEngine = new DAGEngine()
+    dagEngine = new DAGEngine(taskBoard)
     executor = new MastraExecutor()
     validator = new SchemaValidator()
   })
@@ -144,14 +144,15 @@ describe('Mission Lifecycle Integration', () => {
     expect(digest.totalResults).toBe(3)
     expect(digest.averageConfidence).toBeGreaterThan(0)
 
-    // Step 7: Advance to interactive phase
+    // Step 7: Advance to interactive phase (tasks are verified, so transition should succeed)
     const advanced = await dagEngine.advanceToNextPhase()
     expect(advanced).toBe(true)
     expect(dagEngine.getCurrentPhase()!.id).toBe('phase-interactive')
 
-    // Step 8: Create interaction thread
+    // Step 8: Create interaction threads (using DAGEngine naming convention)
+    const threadId = 'phase-interactive-thread-proponent'
     const thread: InteractionThread = {
-      id: 'thread-1',
+      id: threadId,
       missionId: mission.id,
       postTaskId: tasks[0].id,
       postAuthor: mission.blueprints[0],
@@ -160,14 +161,14 @@ describe('Mission Lifecycle Integration', () => {
       status: 'active',
     }
     dagEngine.setThread(thread)
-    expect(dagEngine.getThread('thread-1')).toBeDefined()
+    expect(dagEngine.getThread(threadId)).toBeDefined()
 
     // Step 9: Simulate one round of interaction
     const roundTasks: Task[] = mission.blueprints.slice(1).map((bp, i) => ({
       id: `task-interactive-${i}`,
       missionId: mission.id,
       phaseId: 'phase-interactive',
-      threadId: 'thread-1',
+      threadId,
       type: 'comment',
       blueprint: bp,
       instructions: 'Respond to the initial stance',
@@ -209,7 +210,7 @@ describe('Mission Lifecycle Integration', () => {
     expect(advancedAgain).toBe(true)
     expect(dagEngine.getCurrentPhase()!.id).toBe('phase-aggregate')
 
-    // Step 13: Complete mission
+    // Step 13: Complete mission (valid transition: running → completed)
     missionManager.updateStatus(mission.id, 'completed')
     expect(missionManager.getMission(mission.id)!.status).toBe('completed')
   })

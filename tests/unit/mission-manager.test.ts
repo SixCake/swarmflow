@@ -84,14 +84,34 @@ describe('MissionManager', () => {
     it('should update the updatedAt timestamp', () => {
       manager.createMission(makeMission())
       const before = manager.getMission('mission-1')!.updatedAt
-      // Small delay to ensure timestamp difference
-      manager.updateStatus('mission-1', 'completed')
+      // Valid transition: created → running
+      manager.updateStatus('mission-1', 'running')
       const after = manager.getMission('mission-1')!.updatedAt
       expect(after.getTime()).toBeGreaterThanOrEqual(before.getTime())
     })
 
-    it('should not throw when updating non-existent mission', () => {
-      expect(() => manager.updateStatus('non-existent', 'running')).not.toThrow()
+    it('should throw when updating non-existent mission', () => {
+      expect(() => manager.updateStatus('non-existent', 'running')).toThrow('Mission not found')
+    })
+
+    it('should throw on invalid state transition', () => {
+      manager.createMission(makeMission())
+      // created → completed is not allowed (must go through running first)
+      expect(() => manager.updateStatus('mission-1', 'completed')).toThrow('Invalid status transition')
+    })
+
+    it('should allow valid state transitions', () => {
+      manager.createMission(makeMission())
+      manager.updateStatus('mission-1', 'running')
+      manager.updateStatus('mission-1', 'completed')
+      expect(manager.getMission('mission-1')!.status).toBe('completed')
+    })
+
+    it('should not allow transitions from terminal states', () => {
+      manager.createMission(makeMission())
+      manager.updateStatus('mission-1', 'running')
+      manager.updateStatus('mission-1', 'completed')
+      expect(() => manager.updateStatus('mission-1', 'running')).toThrow('Invalid status transition')
     })
   })
 
