@@ -1,0 +1,63 @@
+{
+  "name": "swarm-flow",
+  "version": "0.1.0",
+  "description": "Distributed AI Agent task orchestration framework, powered by Mastra",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./worker": {
+      "import": "./dist/worker/worker-thread.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "demo": "tsx examples/product-evaluation.ts"
+  },
+  "peerDependencies": {
+    "@mastra/core": ">=0.10.0"
+  },
+  "dependencies": {
+    "fastify": "^5.2.0",
+    "@fastify/rate-limit": "^10.2.0",
+    "@fastify/bearer-auth": "^10.1.0",
+    "zod": "^3.24.0",
+    "nanoid": "^5.1.0"
+  },
+  "devDependencies": {
+    "@mastra/core": "^0.10.0",
+    "typescript": "^5.7.0",
+    "tsx": "^4.19.0",
+    "vitest": "^3.1.0",
+    "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "orchestration",
+    "distributed",
+    "swarm",
+    "mastra",
+    "task-board",
+    "dag",
+    "llm"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/swarm-flow.git"
+  }
+}
