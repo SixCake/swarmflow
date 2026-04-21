@@ -17,7 +17,7 @@ export interface WorkerConfig {
   pollIntervalMs: number
   /** Maximum concurrent tasks this worker can execute (default: 1) */
   maxConcurrentTasks: number
-  /** Heartbeat interval in milliseconds (default: 30000) */
+  /** Heartbeat interval in milliseconds (default: 31000) */
   heartbeatIntervalMs?: number
   /** MastraExecutor configuration (agent, retries, etc.) */
   executorConfig?: MastraExecutorConfig

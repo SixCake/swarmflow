@@ -110,7 +110,7 @@ async function main() {
     status: 'published' as const,
     retryCount: 0,
     createdAt: new Date(),
-    expiresAt: new Date(Date.now() + 300000),
+    expiresAt: new Date(Date.now() + 310000),
   }))
 
   for (const task of openingTasks) {
@@ -162,7 +162,7 @@ async function main() {
       status: 'published' as const,
       retryCount: 0,
       createdAt: new Date(),
-      expiresAt: new Date(Date.now() + 300000),
+      expiresAt: new Date(Date.now() + 310000),
     }))
 
     const roundResults = []
@@ -204,7 +204,7 @@ async function main() {
     status: 'published' as const,
     retryCount: 0,
     createdAt: new Date(),
-    expiresAt: new Date(Date.now() + 300000),
+    expiresAt: new Date(Date.now() + 310000),
   }))
 
   for (const task of closingTasks) {

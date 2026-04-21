@@ -59,7 +59,7 @@ npm install swarm-flow
 import { SwarmFlow } from 'swarm-flow'
 import type { Mission } from 'swarm-flow'
 
-const swarm = new SwarmFlow({ port: 3000 })
+const swarm = new SwarmFlow({ port: 3100 })
 
 const mission: Mission = {
   id: 'debate-1',
@@ -93,22 +93,22 @@ SwarmFlow exposes a full REST API for mission and task management:
 
 ```bash
 # Create a mission
-curl -X POST http://localhost:3000/missions \
+curl -X POST http://localhost:3100/missions \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"id":"m1","goal":"Evaluate AI regulation","agentBlueprints":[...],"phases":[...]}'
 
 # List available tasks
-curl http://localhost:3000/tasks/available \
+curl http://localhost:3100/tasks/available \
   -H "Authorization: Bearer <token>"
 
 # Claim a task
-curl -X POST http://localhost:3000/tasks/task-1/claim \
+curl -X POST http://localhost:3100/tasks/task-1/claim \
   -H "Authorization: Bearer <token>" \
   -d '{"workerId":"worker-1"}'
 
 # Submit result
-curl -X POST http://localhost:3000/tasks/task-1/submit \
+curl -X POST http://localhost:3100/tasks/task-1/submit \
   -H "Authorization: Bearer <token>" \
   -d '{"output":{...},"metadata":{...}}'
 ```
@@ -197,7 +197,7 @@ The dashboard requires username/password authentication with built-in brute-forc
 
 ```typescript
 const swarm = new SwarmFlow({
-  port: 3000,
+  port: 3100,
   authToken: 'my-secret-token',
   dashboardAuth: {
     username: 'admin',                // Dashboard login username
@@ -223,7 +223,7 @@ SWARMFLOW_DASH_PASS=your-secure-password
 
 ```typescript
 const swarm = new SwarmFlow({
-  port: 3000,                    // HTTP server port
+  port: 3100,                    // HTTP server port
   authToken: 'my-secret-token',  // Bearer token for API auth
   dashboardAuth: {               // Dashboard admin credentials (optional)
     username: 'admin',

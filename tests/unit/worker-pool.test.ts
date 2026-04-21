@@ -20,7 +20,7 @@ describe('WorkerPool', () => {
     it('should create workers up to maxWorkers', async () => {
       const pool = new WorkerPool(3)
       await pool.initialize({
-        apiUrl: 'http://localhost:3000',
+        apiUrl: 'http://localhost:3100',
         agentToken: 'test-token',
         capabilities: ['analysis'],
         pollIntervalMs: 1000,
@@ -34,7 +34,7 @@ describe('WorkerPool', () => {
     it('should start all workers', async () => {
       const pool = new WorkerPool(2)
       await pool.initialize({
-        apiUrl: 'http://localhost:3000',
+        apiUrl: 'http://localhost:3100',
         agentToken: 'test-token',
         capabilities: [],
         pollIntervalMs: 1000,
@@ -47,7 +47,7 @@ describe('WorkerPool', () => {
     it('should stop all workers', async () => {
       const pool = new WorkerPool(2)
       await pool.initialize({
-        apiUrl: 'http://localhost:3000',
+        apiUrl: 'http://localhost:3100',
         agentToken: 'test-token',
         capabilities: [],
         pollIntervalMs: 1000,
@@ -63,7 +63,7 @@ describe('WorkerPool', () => {
     it('should return correct stats after initialization and start', async () => {
       const pool = new WorkerPool(4)
       await pool.initialize({
-        apiUrl: 'http://localhost:3000',
+        apiUrl: 'http://localhost:3100',
         agentToken: 'test-token',
         capabilities: ['review'],
         pollIntervalMs: 500,
@@ -78,7 +78,7 @@ describe('WorkerPool', () => {
     it('should reflect stopped workers', async () => {
       const pool = new WorkerPool(3)
       await pool.initialize({
-        apiUrl: 'http://localhost:3000',
+        apiUrl: 'http://localhost:3100',
         agentToken: 'test-token',
         capabilities: [],
         pollIntervalMs: 1000,
