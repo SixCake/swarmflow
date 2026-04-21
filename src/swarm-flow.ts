@@ -13,11 +13,15 @@ import { MastraExecutor } from './worker/mastra-executor.js'
 import { createApp } from './server/app.js'
 import { getConvergenceStrategy } from './core/convergence.js'
 
+import type { DashboardAuthConfig } from './server/middleware/dashboard-auth.js'
+
 export interface SwarmFlowConfig {
   port?: number
   authToken?: string
   workerCount?: number
   logger?: boolean
+  /** Dashboard admin credentials — if omitted, dashboard is disabled */
+  dashboardAuth?: DashboardAuthConfig
 }
 
 export class SwarmFlow {
@@ -86,6 +90,7 @@ export class SwarmFlow {
       {
         auth: this.config.authToken ? { token: this.config.authToken } : undefined,
         logger: this.config.logger ?? false,
+        dashboardAuth: this.config.dashboardAuth,
       },
       { missionManager: this.missionManager, taskBoard: this.taskBoard }
     )

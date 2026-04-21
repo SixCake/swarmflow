@@ -13,6 +13,7 @@ import { registerTerminalRoutes } from './routes/terminal.routes.js'
 import { registerCommentRoutes } from './routes/comment.routes.js'
 import { registerThreadRoutes } from './routes/thread.routes.js'
 import { registerDashboardRoutes } from './routes/dashboard.routes.js'
+import type { DashboardAuthConfig } from './middleware/dashboard-auth.js'
 import { MissionManager } from '../core/mission-manager.js'
 import { TaskBoard } from '../core/task-board.js'
 import { DAGEngine } from '../core/dag-engine.js'
@@ -22,6 +23,8 @@ export interface AppConfig {
   auth?: AuthConfig
   rateLimit?: RateLimitConfig
   logger?: boolean
+  /** Dashboard admin credentials — if omitted, dashboard is disabled */
+  dashboardAuth?: DashboardAuthConfig
 }
 
 export interface AppDependencies {
@@ -69,7 +72,7 @@ export async function createApp(
   registerTerminalRoutes(app, terminalRegistry)
   registerCommentRoutes(app, commentBoard)
   registerThreadRoutes(app, dagEngine)
-  registerDashboardRoutes(app, missionManager, taskBoard, terminalRegistry, dagEngine)
+  registerDashboardRoutes(app, missionManager, taskBoard, terminalRegistry, dagEngine, config.dashboardAuth)
 
   // Global error handler
   app.setErrorHandler((error, _request, reply) => {

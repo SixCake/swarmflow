@@ -10,6 +10,13 @@ const swarm = new SwarmFlow({
   port: PORT,
   authToken: process.env.SWARMFLOW_AUTH_TOKEN ?? 'test-token',
   logger: true,
+  dashboardAuth: {
+    username: process.env.SWARMFLOW_DASH_USER ?? 'admin',
+    password: process.env.SWARMFLOW_DASH_PASS ?? 'swarmflow',
+    maxLoginAttempts: 5,
+    rateLimitWindowSeconds: 60,
+    lockoutDurationSeconds: 300,
+  },
 })
 
 const mission: Mission = {
@@ -61,9 +68,11 @@ const record = await swarm.start(mission)
 console.log(`✅ Mission created: ${record.id}`)
 console.log(`   Status: ${record.status}`)
 console.log(`\n📡 Server running at http://127.0.0.1:${PORT}`)
+console.log(`   Dashboard: http://127.0.0.1:${PORT}/dashboard`)
 console.log(`   Health:    GET  http://127.0.0.1:${PORT}/health`)
 console.log(`   Tasks:     GET  http://127.0.0.1:${PORT}/tasks/available`)
 console.log(`   Missions:  GET  http://127.0.0.1:${PORT}/missions`)
+console.log(`\n🔐 Dashboard login: admin / swarmflow (or set SWARMFLOW_DASH_USER / SWARMFLOW_DASH_PASS)`)
 console.log(`\n⏳ Waiting for external agents to connect...\n`)
 console.log(`   Press Ctrl+C to stop.\n`)
 
