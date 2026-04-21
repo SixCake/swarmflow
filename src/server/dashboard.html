@@ -744,6 +744,87 @@ body {
         <h1 class="page-title">Missions</h1>
         <p class="page-subtitle">Manage and monitor all orchestration missions</p>
       </div>
+
+      <!-- Create Mission Form -->
+      <div class="card" style="margin-bottom:24px;border-color:var(--accent-cyan);border-style:dashed" id="mission-create-card">
+        <div class="card-header" style="cursor:pointer" onclick="toggleMissionForm()">
+          <span class="card-title" style="color:var(--accent-cyan-light)">🚀 Create New Mission</span>
+          <span id="mission-form-toggle" style="color:var(--text-muted);font-size:0.8rem">▼ Expand</span>
+        </div>
+        <div id="mission-form-body" style="display:none;margin-top:12px">
+          <form id="mission-create-form" style="display:flex;flex-direction:column;gap:16px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <div>
+                <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Mission ID <span style="color:var(--accent-red)">*</span></label>
+                <input type="text" id="mc-id" placeholder="e.g. debate-ai-regulation" required
+                  style="width:100%;padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-family:var(--font-mono);font-size:0.88rem;outline:none;transition:border-color var(--transition-fast)"
+                  onfocus="this.style.borderColor='var(--accent-cyan)'" onblur="this.style.borderColor='var(--border-color)'">
+              </div>
+              <div>
+                <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Convergence Strategy</label>
+                <select id="mc-convergence"
+                  style="width:100%;padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-family:var(--font-mono);font-size:0.88rem;outline:none">
+                  <option value="consensus">consensus</option>
+                  <option value="mutualIntent">mutualIntent</option>
+                  <option value="bothAgree">bothAgree</option>
+                  <option value="fixedRounds">fixedRounds</option>
+                  <option value="stability">stability</option>
+                  <option value="hybrid">hybrid</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Goal <span style="color:var(--accent-red)">*</span></label>
+              <textarea id="mc-goal" placeholder="Describe the mission objective…" required rows="2"
+                style="width:100%;padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-family:var(--font-sans);font-size:0.88rem;outline:none;resize:vertical;transition:border-color var(--transition-fast)"
+                onfocus="this.style.borderColor='var(--accent-cyan)'" onblur="this.style.borderColor='var(--border-color)'"></textarea>
+            </div>
+
+            <!-- Agent Blueprints -->
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <label style="font-size:0.8rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Agent Blueprints <span style="color:var(--accent-red)">*</span></label>
+                <button type="button" onclick="addBlueprintRow()"
+                  style="padding:4px 10px;background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);border-radius:var(--radius-sm);color:var(--accent-purple-light);font-size:0.78rem;cursor:pointer">+ Add Agent</button>
+              </div>
+              <div id="mc-blueprints" style="display:flex;flex-direction:column;gap:8px">
+                <div class="blueprint-row" style="display:grid;grid-template-columns:150px 1fr 30px;gap:8px;align-items:start">
+                  <input type="text" placeholder="Role" class="bp-role"
+                    style="padding:8px 12px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-family:var(--font-mono);font-size:0.82rem;outline:none">
+                  <input type="text" placeholder="Instructions for this agent" class="bp-instructions"
+                    style="padding:8px 12px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-family:var(--font-sans);font-size:0.82rem;outline:none">
+                  <span></span>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px">
+              <button type="submit" id="btn-create-mission"
+                style="padding:10px 24px;background:linear-gradient(135deg,var(--accent-cyan),var(--accent-cyan-light));border:none;border-radius:var(--radius-sm);color:#0F172A;font-family:var(--font-sans);font-size:0.88rem;font-weight:600;cursor:pointer;transition:all var(--transition-fast);letter-spacing:0.02em">
+                Create Mission
+              </button>
+              <span id="mc-status" style="font-size:0.85rem;color:var(--text-muted)"></span>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Search/Filter -->
+      <div style="display:flex;gap:12px;margin-bottom:16px;align-items:center">
+        <input type="text" id="missions-search" placeholder="🔍 Search missions…" oninput="renderMissions()"
+          style="flex:1;max-width:300px;padding:8px 14px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-family:var(--font-sans);font-size:0.85rem;outline:none"
+          onfocus="this.style.borderColor='var(--accent-purple)'" onblur="this.style.borderColor='var(--border-color)'">
+        <select id="missions-filter" onchange="renderMissions()"
+          style="padding:8px 14px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-family:var(--font-mono);font-size:0.82rem;outline:none">
+          <option value="">All Statuses</option>
+          <option value="created">Created</option>
+          <option value="running">Running</option>
+          <option value="completed">Completed</option>
+          <option value="failed">Failed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <span class="card-title">All Missions</span>
@@ -758,6 +839,7 @@ body {
                 <th>Phases</th>
                 <th>Agents</th>
                 <th>Convergence</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="missions-tbody"></tbody>
@@ -765,7 +847,7 @@ body {
           <div class="empty-state" id="missions-empty">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
             <p>No missions found</p>
-            <p class="empty-hint">Create a mission via the REST API to get started</p>
+            <p class="empty-hint">Use the form above to create your first mission</p>
           </div>
         </div>
       </div>
@@ -801,6 +883,24 @@ body {
         </div>
       </div>
 
+      <!-- Search/Filter -->
+      <div style="display:flex;gap:12px;margin-bottom:16px;align-items:center">
+        <input type="text" id="tasks-search" placeholder="🔍 Search tasks…" oninput="renderTasks()"
+          style="flex:1;max-width:300px;padding:8px 14px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-family:var(--font-sans);font-size:0.85rem;outline:none"
+          onfocus="this.style.borderColor='var(--accent-purple)'" onblur="this.style.borderColor='var(--border-color)'">
+        <select id="tasks-filter" onchange="renderTasks()"
+          style="padding:8px 14px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-family:var(--font-mono);font-size:0.82rem;outline:none">
+          <option value="">All Statuses</option>
+          <option value="published">Published</option>
+          <option value="claimed">Claimed</option>
+          <option value="submitted">Submitted</option>
+          <option value="verified">Verified</option>
+          <option value="rejected">Rejected</option>
+          <option value="timeout">Timeout</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+
       <div class="card">
         <div class="card-header">
           <span class="card-title">All Tasks</span>
@@ -817,6 +917,7 @@ body {
                 <th>Claimed By</th>
                 <th>Retries</th>
                 <th>Created</th>
+                <th></th>
               </tr>
             </thead>
             <tbody id="tasks-tbody"></tbody>
@@ -826,6 +927,17 @@ body {
             <p>No tasks found</p>
             <p class="empty-hint">Tasks are created when missions start running</p>
           </div>
+        </div>
+      </div>
+
+      <!-- Task Detail Panel -->
+      <div id="task-detail-panel" style="display:none;margin-top:16px">
+        <div class="card" style="border-color:var(--accent-cyan)">
+          <div class="card-header">
+            <span class="card-title" style="color:var(--accent-cyan-light)">📋 Task Detail</span>
+            <button onclick="closeTaskDetail()" style="background:none;border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-muted);padding:4px 10px;cursor:pointer;font-size:0.78rem">✕ Close</button>
+          </div>
+          <div id="task-detail-content" style="margin-top:12px"></div>
         </div>
       </div>
     </div>
@@ -1094,20 +1206,43 @@ function renderOverview() {
 function renderMissions() {
   const tbody = document.getElementById('missions-tbody');
   const emptyEl = document.getElementById('missions-empty');
+  const searchQuery = (document.getElementById('missions-search')?.value || '').toLowerCase();
+  const statusFilter = document.getElementById('missions-filter')?.value || '';
 
-  if (state.missions.length === 0) {
+  let filtered = state.missions;
+  if (searchQuery) {
+    filtered = filtered.filter(record => {
+      const mission = record.mission || record;
+      return (mission.id || '').toLowerCase().includes(searchQuery) ||
+             (mission.goal || '').toLowerCase().includes(searchQuery);
+    });
+  }
+  if (statusFilter) {
+    filtered = filtered.filter(record => {
+      const status = record.status || (record.mission || record).status || 'created';
+      return status === statusFilter;
+    });
+  }
+
+  if (filtered.length === 0) {
     tbody.innerHTML = '';
     emptyEl.style.display = 'block';
+    document.getElementById('badge-missions').textContent = state.missions.length;
     return;
   }
 
   emptyEl.style.display = 'none';
-  tbody.innerHTML = state.missions.map(record => {
+  tbody.innerHTML = filtered.map(record => {
     const mission = record.mission || record;
     const status = record.status || mission.status || 'created';
     const phases = mission.phases || [];
     const blueprints = mission.blueprints || mission.agentBlueprints || [];
     const convergence = mission.convergencePolicy || '—';
+    const canCancel = status === 'created' || status === 'running';
+
+    const actionHtml = canCancel
+      ? '<button onclick="cancelMission(\'' + mission.id + '\')" style="padding:4px 10px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);color:var(--accent-red);font-size:0.75rem;cursor:pointer;transition:all var(--transition-fast)" onmouseover="this.style.background=\'rgba(239,68,68,0.2)\'" onmouseout="this.style.background=\'rgba(239,68,68,0.1)\'">Cancel</button>'
+      : '<span style="color:var(--text-muted);font-size:0.75rem">' + status + '</span>';
 
     return '<tr>' +
       '<td class="id-cell" title="' + mission.id + '">' + truncateId(mission.id) + '</td>' +
@@ -1116,6 +1251,7 @@ function renderMissions() {
       '<td style="font-family:var(--font-mono);font-size:0.82rem">' + phases.length + '</td>' +
       '<td style="font-family:var(--font-mono);font-size:0.82rem">' + blueprints.length + '</td>' +
       '<td style="font-size:0.82rem;color:var(--text-secondary)">' + (typeof convergence === 'string' ? convergence : convergence.strategy || '—') + '</td>' +
+      '<td>' + actionHtml + '</td>' +
     '</tr>';
   }).join('');
 
@@ -1125,6 +1261,8 @@ function renderMissions() {
 function renderTasks() {
   const tbody = document.getElementById('tasks-tbody');
   const emptyEl = document.getElementById('tasks-empty');
+  const searchQuery = (document.getElementById('tasks-search')?.value || '').toLowerCase();
+  const statusFilter = document.getElementById('tasks-filter')?.value || '';
 
   const tasksByStatus = {};
   for (const task of state.tasks) {
@@ -1138,14 +1276,28 @@ function renderTasks() {
   document.getElementById('tstat-verified').textContent = tasksByStatus['verified'] || 0;
   document.getElementById('tstat-failed').textContent = (tasksByStatus['rejected'] || 0) + (tasksByStatus['timeout'] || 0);
 
-  if (state.tasks.length === 0) {
+  let filtered = state.tasks;
+  if (searchQuery) {
+    filtered = filtered.filter(task =>
+      (task.id || '').toLowerCase().includes(searchQuery) ||
+      (task.missionId || '').toLowerCase().includes(searchQuery) ||
+      (task.type || '').toLowerCase().includes(searchQuery) ||
+      (task.claimedBy || '').toLowerCase().includes(searchQuery)
+    );
+  }
+  if (statusFilter) {
+    filtered = filtered.filter(task => task.status === statusFilter);
+  }
+
+  if (filtered.length === 0) {
     tbody.innerHTML = '';
     emptyEl.style.display = 'block';
+    document.getElementById('badge-tasks').textContent = state.tasks.length;
     return;
   }
 
   emptyEl.style.display = 'none';
-  tbody.innerHTML = state.tasks.map(task =>
+  tbody.innerHTML = filtered.map(task =>
     '<tr>' +
       '<td class="id-cell" title="' + task.id + '">' + truncateId(task.id) + '</td>' +
       '<td class="id-cell" title="' + (task.missionId || '') + '">' + truncateId(task.missionId) + '</td>' +
@@ -1155,10 +1307,67 @@ function renderTasks() {
       '<td style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-muted)">' + (task.claimedBy ? truncateId(task.claimedBy) : '—') + '</td>' +
       '<td style="font-family:var(--font-mono);font-size:0.82rem;text-align:center">' + (task.retryCount || 0) + '</td>' +
       '<td style="font-size:0.8rem;color:var(--text-muted);white-space:nowrap">' + formatDate(task.createdAt) + '</td>' +
+      '<td><button onclick="showTaskDetail(\'' + task.id + '\')" style="padding:3px 8px;background:rgba(6,182,212,0.1);border:1px solid rgba(6,182,212,0.3);border-radius:var(--radius-sm);color:var(--accent-cyan);font-size:0.72rem;cursor:pointer">Detail</button></td>' +
     '</tr>'
   ).join('');
 
   document.getElementById('badge-tasks').textContent = state.tasks.length;
+}
+
+/* ── Task Detail ── */
+function showTaskDetail(taskId) {
+  const task = state.tasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  const panel = document.getElementById('task-detail-panel');
+  const content = document.getElementById('task-detail-content');
+
+  const result = task.result;
+  const resultHtml = result
+    ? '<div style="margin-top:12px"><span style="color:var(--text-muted);font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em">Result Output</span>' +
+      '<pre style="margin-top:6px;padding:12px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);overflow-x:auto;max-height:300px;white-space:pre-wrap">' + escapeHtml(JSON.stringify(result.output || result, null, 2)) + '</pre></div>' +
+      (result.metadata ? '<div style="margin-top:12px"><span style="color:var(--text-muted);font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em">Metadata</span>' +
+        '<pre style="margin-top:6px;padding:12px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);overflow-x:auto;max-height:200px;white-space:pre-wrap">' + escapeHtml(JSON.stringify(result.metadata, null, 2)) + '</pre></div>' : '')
+    : '<div style="margin-top:12px;color:var(--text-muted);font-size:0.85rem">No result submitted yet</div>';
+
+  const instructionsHtml = task.instructions
+    ? '<div style="margin-top:12px"><span style="color:var(--text-muted);font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em">Instructions</span>' +
+      '<div style="margin-top:6px;padding:12px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);font-size:0.85rem;color:var(--text-secondary);white-space:pre-wrap">' + escapeHtml(task.instructions) + '</div></div>'
+    : '';
+
+  const contextHtml = task.context && Object.keys(task.context).length > 0
+    ? '<div style="margin-top:12px"><span style="color:var(--text-muted);font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em">Context</span>' +
+      '<pre style="margin-top:6px;padding:12px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);overflow-x:auto;max-height:200px;white-space:pre-wrap">' + escapeHtml(JSON.stringify(task.context, null, 2)) + '</pre></div>'
+    : '';
+
+  content.innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">' +
+      '<div><span style="color:var(--text-muted);font-size:0.72rem;text-transform:uppercase">Task ID</span><div style="font-family:var(--font-mono);font-size:0.85rem;color:var(--accent-cyan);margin-top:2px;word-break:break-all">' + task.id + '</div></div>' +
+      '<div><span style="color:var(--text-muted);font-size:0.72rem;text-transform:uppercase">Mission</span><div style="font-family:var(--font-mono);font-size:0.85rem;margin-top:2px">' + (task.missionId || '—') + '</div></div>' +
+      '<div><span style="color:var(--text-muted);font-size:0.72rem;text-transform:uppercase">Phase</span><div style="font-size:0.85rem;margin-top:2px">' + (task.phaseId || '—') + '</div></div>' +
+      '<div><span style="color:var(--text-muted);font-size:0.72rem;text-transform:uppercase">Type</span><div style="font-size:0.85rem;margin-top:2px">' + (task.type || '—') + '</div></div>' +
+      '<div><span style="color:var(--text-muted);font-size:0.72rem;text-transform:uppercase">Status</span><div style="margin-top:2px">' + renderBadge(task.status) + '</div></div>' +
+      '<div><span style="color:var(--text-muted);font-size:0.72rem;text-transform:uppercase">Claimed By</span><div style="font-family:var(--font-mono);font-size:0.85rem;margin-top:2px">' + (task.claimedBy || '—') + '</div></div>' +
+      '<div><span style="color:var(--text-muted);font-size:0.72rem;text-transform:uppercase">Retries</span><div style="font-family:var(--font-mono);font-size:0.85rem;margin-top:2px">' + (task.retryCount || 0) + '</div></div>' +
+      '<div><span style="color:var(--text-muted);font-size:0.72rem;text-transform:uppercase">Created</span><div style="font-size:0.85rem;margin-top:2px">' + formatDate(task.createdAt) + '</div></div>' +
+    '</div>' +
+    (task.blueprint ? '<div style="margin-bottom:8px"><span style="color:var(--text-muted);font-size:0.72rem;text-transform:uppercase">Blueprint</span><div style="font-size:0.85rem;margin-top:2px"><strong style="color:var(--accent-purple-light)">' + (task.blueprint.role || '—') + '</strong> — ' + (task.blueprint.instructions || '').slice(0, 200) + '</div></div>' : '') +
+    instructionsHtml +
+    contextHtml +
+    resultHtml;
+
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeTaskDetail() {
+  document.getElementById('task-detail-panel').style.display = 'none';
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 function renderTerminals() {
@@ -1231,6 +1440,130 @@ function renderThreads() {
   document.getElementById('badge-threads').textContent = state.threads.length;
 }
 
+/* ── Mission Management ── */
+function toggleMissionForm() {
+  const body = document.getElementById('mission-form-body');
+  const toggle = document.getElementById('mission-form-toggle');
+  if (body.style.display === 'none') {
+    body.style.display = 'block';
+    toggle.textContent = '▲ Collapse';
+  } else {
+    body.style.display = 'none';
+    toggle.textContent = '▼ Expand';
+  }
+}
+
+function addBlueprintRow() {
+  const container = document.getElementById('mc-blueprints');
+  const row = document.createElement('div');
+  row.className = 'blueprint-row';
+  row.style.cssText = 'display:grid;grid-template-columns:150px 1fr 30px;gap:8px;align-items:start';
+  row.innerHTML =
+    '<input type="text" placeholder="Role" class="bp-role" style="padding:8px 12px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-family:var(--font-mono);font-size:0.82rem;outline:none">' +
+    '<input type="text" placeholder="Instructions for this agent" class="bp-instructions" style="padding:8px 12px;background:var(--bg-primary);border:1px solid var(--border-color);border-radius:var(--radius-sm);color:var(--text-primary);font-family:var(--font-sans);font-size:0.82rem;outline:none">' +
+    '<button type="button" onclick="this.parentElement.remove()" style="padding:4px 8px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);color:var(--accent-red);cursor:pointer;font-size:0.8rem">✕</button>';
+  container.appendChild(row);
+}
+
+async function createMission(event) {
+  event.preventDefault();
+
+  const missionId = document.getElementById('mc-id').value.trim();
+  const goal = document.getElementById('mc-goal').value.trim();
+  const convergenceStrategy = document.getElementById('mc-convergence').value;
+
+  if (!missionId || !goal) return;
+
+  const blueprintRows = document.querySelectorAll('#mc-blueprints .blueprint-row');
+  const blueprints = [];
+  for (const row of blueprintRows) {
+    const role = row.querySelector('.bp-role').value.trim();
+    const instructions = row.querySelector('.bp-instructions').value.trim();
+    if (role && instructions) {
+      blueprints.push({ role, instructions });
+    }
+  }
+
+  if (blueprints.length === 0) {
+    document.getElementById('mc-status').textContent = '❌ Add at least one agent blueprint';
+    document.getElementById('mc-status').style.color = 'var(--accent-red)';
+    return;
+  }
+
+  const statusEl = document.getElementById('mc-status');
+  const btnEl = document.getElementById('btn-create-mission');
+  btnEl.disabled = true;
+  btnEl.textContent = 'Creating…';
+  statusEl.textContent = '';
+
+  try {
+    const response = await fetch(API_BASE + '/missions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: missionId,
+        goal,
+        agentBlueprints: blueprints,
+        convergencePolicy: { strategy: convergenceStrategy },
+      }),
+    });
+
+    if (response.status === 401) {
+      window.location.href = '/dashboard/login';
+      return;
+    }
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      statusEl.textContent = '❌ ' + (data.error || 'Creation failed');
+      statusEl.style.color = 'var(--accent-red)';
+      return;
+    }
+
+    statusEl.textContent = '✅ Mission created: ' + missionId;
+    statusEl.style.color = 'var(--accent-green)';
+    document.getElementById('mc-id').value = '';
+    document.getElementById('mc-goal').value = '';
+
+    await fetchMissions();
+    renderMissions();
+    renderOverview();
+  } catch {
+    statusEl.textContent = '❌ Network error';
+    statusEl.style.color = 'var(--accent-red)';
+  } finally {
+    btnEl.disabled = false;
+    btnEl.textContent = 'Create Mission';
+  }
+}
+
+async function cancelMission(missionId) {
+  if (!confirm('Cancel mission ' + missionId + '? This cannot be undone.')) return;
+
+  try {
+    const response = await fetch(API_BASE + '/missions/' + missionId + '/cancel', {
+      method: 'POST',
+    });
+
+    if (response.status === 401) {
+      window.location.href = '/dashboard/login';
+      return;
+    }
+
+    if (response.ok) {
+      await fetchMissions();
+      renderMissions();
+      renderOverview();
+    } else {
+      const data = await response.json();
+      alert('Failed: ' + (data.error || 'Unknown error'));
+    }
+  } catch {
+    alert('Failed to cancel mission');
+  }
+}
+
 /* ── Agent Management ── */
 function renderAgents() {
   const tbody = document.getElementById('agents-tbody');
@@ -1256,8 +1589,11 @@ function renderAgents() {
     const ipAddress = terminal.registeredFromIp || terminal.ip || '—';
     const isActive = terminal.isActive !== false;
 
-    const actionBtn = isActive
-      ? '<button onclick="deactivateAgent(\'' + terminal.terminalId + '\')" style="padding:4px 10px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);color:var(--accent-red);font-size:0.75rem;cursor:pointer;transition:all var(--transition-fast)" onmouseover="this.style.background=\'rgba(239,68,68,0.2)\'" onmouseout="this.style.background=\'rgba(239,68,68,0.1)\'">Deactivate</button>'
+    const actionBtns = isActive
+      ? '<div style="display:flex;gap:4px">' +
+        '<button onclick="rotateAgentKey(\'' + terminal.terminalId + '\')" style="padding:4px 8px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius-sm);color:var(--accent-amber);font-size:0.72rem;cursor:pointer;transition:all var(--transition-fast)" title="Rotate API Key">🔄 Key</button>' +
+        '<button onclick="deactivateAgent(\'' + terminal.terminalId + '\')" style="padding:4px 8px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);color:var(--accent-red);font-size:0.72rem;cursor:pointer;transition:all var(--transition-fast)">Deactivate</button>' +
+        '</div>'
       : '<span style="color:var(--text-muted);font-size:0.75rem">Deactivated</span>';
 
     return '<tr>' +
@@ -1268,7 +1604,7 @@ function renderAgents() {
       '<td>' + renderBadge(isActive ? 'active' : 'created') + '</td>' +
       '<td style="font-size:0.8rem;color:var(--text-muted);white-space:nowrap">' + formatDate(terminal.registeredAt) + '</td>' +
       '<td style="font-size:0.8rem;color:var(--text-muted);white-space:nowrap">' + formatDate(terminal.lastActiveAt) + '</td>' +
-      '<td>' + actionBtn + '</td>' +
+      '<td>' + actionBtns + '</td>' +
     '</tr>';
   }).join('');
 
@@ -1350,6 +1686,37 @@ function copyApiKey() {
   });
 }
 
+async function rotateAgentKey(terminalId) {
+  if (!confirm('Rotate API key for agent ' + terminalId.slice(0, 8) + '…? The old key will stop working immediately.')) return;
+
+  try {
+    const response = await fetch(API_BASE + '/agents/' + terminalId + '/rotate-key', {
+      method: 'POST',
+    });
+
+    if (response.status === 401) {
+      window.location.href = '/dashboard/login';
+      return;
+    }
+
+    const data = await response.json();
+
+    if (response.ok && data.apiKey) {
+      const resultEl = document.getElementById('reg-result');
+      document.getElementById('reg-result-terminal-id').textContent = data.terminalId;
+      document.getElementById('reg-result-identity').textContent = '(rotated key)';
+      document.getElementById('reg-result-apikey').textContent = data.apiKey;
+      resultEl.style.display = 'block';
+      resultEl.querySelector('span').textContent = '🔄 API Key Rotated Successfully';
+      resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+      alert('Failed: ' + (data.error || 'Unknown error'));
+    }
+  } catch {
+    alert('Failed to rotate key');
+  }
+}
+
 async function deactivateAgent(terminalId) {
   if (!confirm('Deactivate agent ' + terminalId.slice(0, 8) + '…? This will revoke its API key.')) return;
 
@@ -1410,6 +1777,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const regForm = document.getElementById('agent-register-form');
   if (regForm) regForm.addEventListener('submit', registerAgent);
+
+  const mcForm = document.getElementById('mission-create-form');
+  if (mcForm) mcForm.addEventListener('submit', createMission);
 });
 </script>
 </body>

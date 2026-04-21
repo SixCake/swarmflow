@@ -134,6 +134,67 @@ export function registerDashboardRoutes(
     reply.send(missions)
   })
 
+  app.post<{ Body: { id: string; goal: string; agentBlueprints: Array<{ role: string; instructions: string }>; convergencePolicy?: { strategy: string } } }>(
+    '/dashboard/api/missions',
+    async (request, reply) => {
+      const { id, goal, agentBlueprints, convergencePolicy } = request.body ?? {}
+
+      if (!id || !goal) {
+        reply.code(400).send({ error: 'Missing required fields: id, goal' })
+        return
+      }
+
+      if (!Array.isArray(agentBlueprints) || agentBlueprints.length === 0) {
+        reply.code(400).send({ error: 'At least one agent blueprint is required' })
+        return
+      }
+
+      try {
+        const record = missionManager.createMission({
+          id,
+          goal,
+          context: {},
+          blueprints: agentBlueprints.map(bp => ({
+            role: bp.role,
+            instructions: bp.instructions,
+          })),
+          phases: [
+            {
+              id: 'phase-1',
+              type: 'parallel',
+              blueprintRoles: agentBlueprints.map(bp => bp.role),
+              transitionRule: { type: 'all_completed' },
+            },
+          ],
+          convergencePolicy: (convergencePolicy?.strategy as any) ?? 'consensus',
+          config: {},
+        })
+        reply.code(201).send(record)
+      } catch (error: any) {
+        reply.code(400).send({ error: error.message || 'Failed to create mission' })
+      }
+    },
+  )
+
+  app.post<{ Params: { id: string } }>(
+    '/dashboard/api/missions/:id/cancel',
+    async (request, reply) => {
+      const { id } = request.params
+      const record = missionManager.getMission(id)
+      if (!record) {
+        reply.code(404).send({ error: 'Mission not found' })
+        return
+      }
+
+      try {
+        missionManager.cancelMission(id)
+        reply.send({ success: true, missionId: id })
+      } catch (error: any) {
+        reply.code(400).send({ error: error.message || 'Cannot cancel mission' })
+      }
+    },
+  )
+
   app.get('/dashboard/api/tasks', async (_request, reply) => {
     const tasks = taskBoard.listAll()
     reply.send(tasks)
@@ -191,6 +252,20 @@ export function registerDashboardRoutes(
         capabilities: terminal.capabilities,
         registeredAt: terminal.registeredAt.toISOString(),
       })
+    },
+  )
+
+  app.post<{ Params: { id: string } }>(
+    '/dashboard/api/agents/:id/rotate-key',
+    async (request, reply) => {
+      const { id } = request.params
+      const newApiKey = `sf-${randomUUID().replace(/-/g, '')}`
+      const result = terminalRegistry.rotateKey(id, newApiKey)
+      if (!result) {
+        reply.code(404).send({ error: 'Agent not found' })
+        return
+      }
+      reply.send({ terminalId: id, apiKey: result })
     },
   )
 
