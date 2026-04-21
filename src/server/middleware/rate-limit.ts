@@ -1,29 +1,19 @@
-// Rate limiting middleware for Fastify
-// Per-endpoint rate limiting
+// Rate limiting middleware using @fastify/rate-limit
 
-import type { FastifyRequest, FastifyReply } from 'fastify'
+import type { FastifyInstance } from 'fastify'
+import rateLimit from '@fastify/rate-limit'
 
-const requestCounts = new Map<string, { count: number; resetTime: number }>()
-const MAX_REQUESTS = 100
-const WINDOW_MS = 60_000 // 1 minute
+export interface RateLimitConfig {
+  max?: number          // max requests per window (default: 100)
+  timeWindow?: string   // time window (default: '1 minute')
+}
 
-export async function rateLimitMiddleware(
-  request: FastifyRequest,
-  reply: FastifyReply
+export async function registerRateLimit(
+  app: FastifyInstance,
+  config: RateLimitConfig = {}
 ): Promise<void> {
-  const ip = request.ip || 'unknown'
-  const now = Date.now()
-  const record = requestCounts.get(ip)
-
-  if (!record || now > record.resetTime) {
-    requestCounts.set(ip, { count: 1, resetTime: now + WINDOW_MS })
-    return
-  }
-
-  if (record.count >= MAX_REQUESTS) {
-    reply.code(429).send({ error: 'Too many requests' })
-    return
-  }
-
-  record.count++
+  await app.register(rateLimit, {
+    max: config.max ?? 100,
+    timeWindow: config.timeWindow ?? '1 minute',
+  })
 }
