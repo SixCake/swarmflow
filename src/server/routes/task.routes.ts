@@ -2,12 +2,28 @@
 
 import type { FastifyInstance } from 'fastify'
 import type { TaskBoard } from '../../core/task-board.js'
+import type { Task } from '../../types/task.types.js'
 import type { TaskResult } from '../../types/result.types.js'
 
 export function registerTaskRoutes(
   app: FastifyInstance,
   taskBoard: TaskBoard
 ): void {
+  // POST /api/tasks — Publish a new task
+  app.post<{ Body: Task }>('/api/tasks', async (request, reply) => {
+    const task = request.body
+    if (!task || !task.id || !task.missionId) {
+      reply.code(400).send({ error: 'Missing required fields: id, missionId' })
+      return
+    }
+    try {
+      taskBoard.publish(task)
+      reply.code(201).send({ success: true, taskId: task.id })
+    } catch (error) {
+      reply.code(500).send({ error: 'Failed to publish task' })
+    }
+  })
+
   // GET /api/tasks/available — Get available tasks for claiming
   app.get<{
     Querystring: { capabilities?: string }
@@ -61,6 +77,17 @@ export function registerTaskRoutes(
       return
     }
 
+    reply.send({ success: true, taskId: id })
+  })
+
+  // POST /api/tasks/:id/verify — Verify a submitted task
+  app.post<{ Params: { id: string } }>('/api/tasks/:id/verify', async (request, reply) => {
+    const { id } = request.params
+    const success = taskBoard.verify(id)
+    if (!success) {
+      reply.code(409).send({ error: 'Task not in submitted state' })
+      return
+    }
     reply.send({ success: true, taskId: id })
   })
 

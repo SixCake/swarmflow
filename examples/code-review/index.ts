@@ -1,15 +1,16 @@
 #!/usr/bin/env npx tsx
 /**
- * SwarmFlow Code Review — Distributed Multi-Agent Review
+ * SwarmFlow Code Review — Distributed Multi-Agent Review (via REST API)
  *
- * Demonstrates a 4-agent code review workflow where specialized reviewers
- * analyze code from different perspectives and converge on a unified assessment.
+ * Demonstrates a 4-agent code review workflow through HTTP REST API where
+ * specialized reviewers analyze code from different perspectives and converge
+ * on a unified assessment.
  *
  * Usage: npx tsx examples/code-review/index.ts
  */
 
-import { SwarmFlow } from '../../src/swarm-flow.js'
-import { TaskBoard } from '../../src/core/task-board.js'
+import { startServer } from '../shared/server-helper.js'
+import { SwarmFlowClient } from '../shared/api-client.js'
 import { MastraExecutor } from '../../src/worker/mastra-executor.js'
 import { buildDigest } from '../../src/core/digest.js'
 import { bothAgree } from '../../src/core/convergence.js'
@@ -18,9 +19,9 @@ import type { Task } from '../../src/types/task.types.js'
 import type { TaskResult } from '../../src/types/result.types.js'
 import type { InteractionThread } from '../../src/types/thread.types.js'
 
-// ─── Helper: create a task from blueprint ────────────────────
+// ─── Helper: create a task object ────────────────────────────
 
-function createTask(
+function buildTask(
   id: string,
   mission: Mission,
   phaseId: string,
@@ -45,18 +46,18 @@ function createTask(
   }
 }
 
-// ─── Helper: execute a task through full lifecycle ───────────
+// ─── Helper: execute a task through full REST API lifecycle ──
 
-async function executeTask(
-  taskBoard: TaskBoard,
+async function executeTaskViaAPI(
+  client: SwarmFlowClient,
   executor: MastraExecutor,
   task: Task,
 ): Promise<TaskResult> {
-  taskBoard.publish(task)
-  taskBoard.claim(task.id, `worker-${task.blueprint.role}`)
+  await client.publishTask(task)
+  await client.claimTask(task.id, `worker-${task.blueprint.role}`)
   const result = await executor.execute(task)
-  taskBoard.submit(task.id, result)
-  taskBoard.verify(task.id)
+  await client.submitTask(task.id, result)
+  await client.verifyTask(task.id)
   return result
 }
 
@@ -172,156 +173,164 @@ const MISSION: Mission = {
 
 async function main() {
   console.log()
-  console.log('╔══════════════════════════════════════════════════════╗')
-  console.log('║   SwarmFlow Code Review — Distributed Multi-Agent   ║')
-  console.log('╚══════════════════════════════════════════════════════╝')
+  console.log('╔══════════════════════════════════════════════════════════╗')
+  console.log('║  SwarmFlow Code Review — Multi-Agent Review (REST API)  ║')
+  console.log('╚══════════════════════════════════════════════════════════╝')
   console.log()
 
-  const swarmFlow = new SwarmFlow()
-  const taskBoard = new TaskBoard()
+  // ── Start Server ────────────────────────────────────────────
+  console.log('🚀 Starting SwarmFlow server...')
+  const server = await startServer({ port: 3211 })
+  const client = new SwarmFlowClient(server.baseUrl)
   const executor = new MastraExecutor()
-
-  // ── Step 1: Create Mission ──────────────────────────────────
-  console.log('📋 Creating review mission:', MISSION.goal)
-  const record = swarmFlow.createMission(MISSION)
-  console.log(`   PR:     ${MISSION.context.pullRequest}`)
-  console.log(`   Repo:   ${MISSION.context.repository}`)
-  console.log(`   Status: ${record.status}`)
+  console.log(`   Server running at ${server.baseUrl}`)
   console.log()
 
-  console.log('📄 Code under review:')
-  console.log('   ─────────────────────────────────────')
-  CODE_UNDER_REVIEW.split('\n').forEach(line => console.log(`   ${line}`))
-  console.log('   ─────────────────────────────────────')
-  console.log()
-
-  // ── Step 2: Phase 1 — Independent Review (Parallel) ────────
-  console.log('═══ Phase 1: Independent Review (Parallel) ═══')
-  console.log()
-
-  const reviewResults: TaskResult[] = []
-
-  for (let i = 0; i < MISSION.blueprints.length; i++) {
-    const bp = MISSION.blueprints[i]
-    const task = createTask(
-      `review-${bp.role}`,
-      MISSION,
-      'independent-review',
-      i,
-      `Review the code from a ${bp.role.replace('-', ' ')} perspective. Provide a score (1-10) and key findings.`,
-    )
-    const result = await executeTask(taskBoard, executor, task)
-    reviewResults.push(result)
-    console.log(`  ✅ ${bp.role}:`)
-    console.log(`     Score: ${result.output.score ?? 'N/A'}/10 | Confidence: ${(result.metadata.confidence * 100).toFixed(0)}%`)
-    console.log(`     Finding: ${result.output.freeformAnalysis}`)
+  try {
+    // ── Step 1: Create Mission via REST API ─────────────────────
+    console.log('📋 POST /api/missions — Creating review mission')
+    const record = await client.createMission(MISSION)
+    console.log(`   PR:     ${MISSION.context.pullRequest}`)
+    console.log(`   Repo:   ${MISSION.context.repository}`)
+    console.log(`   Status: ${record.status}`)
     console.log()
-  }
 
-  const reviewDigest = buildDigest(reviewResults)
-  console.log(`  📊 Review Digest: ${reviewDigest.totalResults} reviews, avg confidence: ${reviewDigest.averageConfidence.toFixed(2)}`)
-  console.log()
+    console.log('📄 Code under review:')
+    console.log('   ─────────────────────────────────────')
+    CODE_UNDER_REVIEW.split('\n').forEach(line => console.log(`   ${line}`))
+    console.log('   ─────────────────────────────────────')
+    console.log()
 
-  // ── Step 3: Phase 2 — Discussion (Interactive) ─────────────
-  console.log('═══ Phase 2: Discussion (Interactive) ═══')
-  console.log()
+    // ── Step 2: Phase 1 — Independent Review (Parallel) ────────
+    console.log('═══ Phase 1: Independent Review (Parallel) ═══')
+    console.log()
 
-  const thread: InteractionThread = {
-    id: 'review-discussion-1',
-    missionId: MISSION.id,
-    postTaskId: `review-${MISSION.blueprints[0].role}`,
-    postAuthor: MISSION.blueprints[0],
-    participants: MISSION.blueprints.slice(1),
-    rounds: [],
-    status: 'active',
-  }
-
-  let roundNumber = 0
-  let converged = false
-
-  while (!converged && roundNumber < 3) {
-    roundNumber++
-    console.log(`  ── Discussion Round ${roundNumber} ──`)
-
-    const roundResults: TaskResult[] = []
-    const roundTasks: Task[] = []
+    const reviewResults: TaskResult[] = []
 
     for (let i = 0; i < MISSION.blueprints.length; i++) {
       const bp = MISSION.blueprints[i]
-      const task = createTask(
-        `discuss-r${roundNumber}-${bp.role}`,
+      const task = buildTask(
+        `review-${bp.role}`,
         MISSION,
-        'discussion',
+        'independent-review',
         i,
-        `Round ${roundNumber}: Discuss your findings with other reviewers. Address any disagreements.`,
-        { threadId: thread.id, type: 'review_discussion' },
+        `Review the code from a ${bp.role.replace('-', ' ')} perspective. Provide a score (1-10) and key findings.`,
       )
-      const result = await executeTask(taskBoard, executor, task)
-      roundResults.push(result)
-      roundTasks.push(task)
-      console.log(`  ✅ ${bp.role}: ${result.output.freeformAnalysis}`)
+      console.log(`  📤 POST /api/tasks — Publish → POST /claim → Execute → POST /submit → POST /verify`)
+      const result = await executeTaskViaAPI(client, executor, task)
+      reviewResults.push(result)
+      console.log(`  ✅ ${bp.role}: Score ${result.output.score ?? 'N/A'}/10 | ${result.output.freeformAnalysis}`)
+      console.log()
     }
 
-    thread.rounds.push({
-      roundNumber,
-      tasks: roundTasks,
-      results: roundResults,
-    })
+    const reviewDigest = buildDigest(reviewResults)
+    console.log(`  📊 Review Digest: ${reviewDigest.totalResults} reviews, avg confidence: ${reviewDigest.averageConfidence.toFixed(2)}`)
+    console.log()
 
-    converged = !bothAgree.shouldThreadContinue(thread)
-    console.log(`  📊 Consensus reached: ${converged}`)
+    // ── Step 3: Phase 2 — Discussion (Interactive) ─────────────
+    console.log('═══ Phase 2: Discussion (Interactive) ═══')
+    console.log()
+
+    const thread: InteractionThread = {
+      id: 'review-discussion-1',
+      missionId: MISSION.id,
+      postTaskId: `review-${MISSION.blueprints[0].role}`,
+      postAuthor: MISSION.blueprints[0],
+      participants: MISSION.blueprints.slice(1),
+      rounds: [],
+      status: 'active',
+    }
+
+    let roundNumber = 0
+    let converged = false
+
+    while (!converged && roundNumber < 3) {
+      roundNumber++
+      console.log(`  ── Discussion Round ${roundNumber} ──`)
+
+      const roundResults: TaskResult[] = []
+      const roundTasks: Task[] = []
+
+      for (let i = 0; i < MISSION.blueprints.length; i++) {
+        const bp = MISSION.blueprints[i]
+        const task = buildTask(
+          `discuss-r${roundNumber}-${bp.role}`,
+          MISSION,
+          'discussion',
+          i,
+          `Round ${roundNumber}: Discuss your findings with other reviewers. Address any disagreements.`,
+          { threadId: thread.id, type: 'review_discussion' },
+        )
+        const result = await executeTaskViaAPI(client, executor, task)
+        roundResults.push(result)
+        roundTasks.push(task)
+        console.log(`  ✅ ${bp.role}: ${result.output.freeformAnalysis}`)
+      }
+
+      thread.rounds.push({
+        roundNumber,
+        tasks: roundTasks,
+        results: roundResults,
+      })
+
+      converged = !bothAgree.shouldThreadContinue(thread)
+      console.log(`  📊 Consensus reached: ${converged}`)
+      console.log()
+    }
+
+    thread.status = 'converged'
+
+    // ── Step 4: Phase 3 — Final Assessment (Aggregate) ─────────
+    console.log('═══ Phase 3: Final Assessment (Aggregate) ═══')
+    console.log()
+
+    const verdictResults: TaskResult[] = []
+
+    for (let i = 0; i < MISSION.blueprints.length; i++) {
+      const bp = MISSION.blueprints[i]
+      const task = buildTask(
+        `verdict-${bp.role}`,
+        MISSION,
+        'final-assessment',
+        i,
+        'Provide your final review verdict considering all discussion points.',
+      )
+      const result = await executeTaskViaAPI(client, executor, task)
+      verdictResults.push(result)
+      console.log(`  ✅ ${bp.role}: Score ${result.output.score ?? 'N/A'}/10 | ${result.output.freeformAnalysis}`)
+    }
+
+    // ── Final Report ───────────────────────────────────────────
+    const allResults = [...reviewResults, ...verdictResults]
+    const finalDigest = buildDigest(allResults)
+
+    console.log()
+    console.log('╔══════════════════════════════════════════════════════════╗')
+    console.log('║               Code Review Final Report                   ║')
+    console.log('╚══════════════════════════════════════════════════════════╝')
+    console.log(`  Pull Request:        ${MISSION.context.pullRequest}`)
+    console.log(`  Repository:          ${MISSION.context.repository}`)
+    console.log(`  Reviewers:           ${MISSION.blueprints.length}`)
+    console.log(`  Total assessments:   ${finalDigest.totalResults}`)
+    console.log(`  Avg confidence:      ${finalDigest.averageConfidence.toFixed(2)}`)
+    console.log(`  Convergence rate:    ${(finalDigest.convergenceRate * 100).toFixed(0)}%`)
+    console.log(`  Key findings:        ${finalDigest.keyArgumentsSummary.length}`)
+    console.log(`  Discussion rounds:   ${roundNumber}`)
+    console.log()
+
+    const avgScore = allResults.reduce((sum, r) => sum + (r.output.score ?? 5), 0) / allResults.length
+    const recommendation = avgScore >= 7 ? '✅ APPROVE' : avgScore >= 5 ? '⚠️  REQUEST CHANGES' : '❌ REJECT'
+    console.log(`  Overall Score:       ${avgScore.toFixed(1)}/10`)
+    console.log(`  Recommendation:      ${recommendation}`)
+    console.log()
+    console.log('✨ Code review complete!')
+  } finally {
+    console.log()
+    console.log('🛑 Shutting down server...')
+    await server.close()
+    console.log('   Server stopped.')
     console.log()
   }
-
-  thread.status = 'converged'
-
-  // ── Step 4: Phase 3 — Final Assessment (Aggregate) ─────────
-  console.log('═══ Phase 3: Final Assessment (Aggregate) ═══')
-  console.log()
-
-  const verdictResults: TaskResult[] = []
-
-  for (let i = 0; i < MISSION.blueprints.length; i++) {
-    const bp = MISSION.blueprints[i]
-    const task = createTask(
-      `verdict-${bp.role}`,
-      MISSION,
-      'final-assessment',
-      i,
-      'Provide your final review verdict considering all discussion points.',
-    )
-    const result = await executeTask(taskBoard, executor, task)
-    verdictResults.push(result)
-    console.log(`  ✅ ${bp.role}:`)
-    console.log(`     Score: ${result.output.score ?? 'N/A'}/10 | Verdict: ${result.output.freeformAnalysis}`)
-  }
-
-  // ── Final Report ───────────────────────────────────────────
-  const allResults = [...reviewResults, ...verdictResults]
-  const finalDigest = buildDigest(allResults)
-
-  console.log()
-  console.log('╔══════════════════════════════════════════════════════╗')
-  console.log('║              Code Review Final Report                ║')
-  console.log('╚══════════════════════════════════════════════════════╝')
-  console.log(`  Pull Request:        ${MISSION.context.pullRequest}`)
-  console.log(`  Repository:          ${MISSION.context.repository}`)
-  console.log(`  Reviewers:           ${MISSION.blueprints.length}`)
-  console.log(`  Total assessments:   ${finalDigest.totalResults}`)
-  console.log(`  Avg confidence:      ${finalDigest.averageConfidence.toFixed(2)}`)
-  console.log(`  Convergence rate:    ${(finalDigest.convergenceRate * 100).toFixed(0)}%`)
-  console.log(`  Key findings:        ${finalDigest.keyArgumentsSummary.length}`)
-  console.log(`  Discussion rounds:   ${roundNumber}`)
-  console.log()
-
-  // Determine overall recommendation
-  const avgScore = allResults.reduce((sum, r) => sum + (r.output.score ?? 5), 0) / allResults.length
-  const recommendation = avgScore >= 7 ? '✅ APPROVE' : avgScore >= 5 ? '⚠️  REQUEST CHANGES' : '❌ REJECT'
-  console.log(`  Overall Score:       ${avgScore.toFixed(1)}/10`)
-  console.log(`  Recommendation:      ${recommendation}`)
-  console.log()
-  console.log('✨ Code review complete!')
-  console.log()
 }
 
 main().catch(console.error)

@@ -1,15 +1,15 @@
 #!/usr/bin/env npx tsx
 /**
- * SwarmFlow Quick Start — 3 Agent Debate
+ * SwarmFlow Quick Start — 3 Agent Debate (via REST API)
  *
- * Demonstrates the core SwarmFlow workflow:
- *   Mission → Phases → Tasks → Results → Digest
+ * Demonstrates the core SwarmFlow workflow through HTTP REST API:
+ *   Start Server → Create Mission → Publish Tasks → Claim → Execute → Submit → Verify → Digest
  *
  * Usage: npx tsx examples/quick-start/index.ts
  */
 
-import { SwarmFlow } from '../../src/swarm-flow.js'
-import { TaskBoard } from '../../src/core/task-board.js'
+import { startServer } from '../shared/server-helper.js'
+import { SwarmFlowClient } from '../shared/api-client.js'
 import { MastraExecutor } from '../../src/worker/mastra-executor.js'
 import { buildDigest } from '../../src/core/digest.js'
 import { mutualIntent } from '../../src/core/convergence.js'
@@ -18,9 +18,9 @@ import type { Task } from '../../src/types/task.types.js'
 import type { TaskResult } from '../../src/types/result.types.js'
 import type { InteractionThread } from '../../src/types/thread.types.js'
 
-// ─── Helper: create a task from blueprint ────────────────────
+// ─── Helper: create a task object ────────────────────────────
 
-function createTask(
+function buildTask(
   id: string,
   mission: Mission,
   phaseId: string,
@@ -45,18 +45,28 @@ function createTask(
   }
 }
 
-// ─── Helper: execute a task through full lifecycle ───────────
+// ─── Helper: execute a task through full REST API lifecycle ──
 
-async function executeTask(
-  taskBoard: TaskBoard,
+async function executeTaskViaAPI(
+  client: SwarmFlowClient,
   executor: MastraExecutor,
   task: Task,
 ): Promise<TaskResult> {
-  taskBoard.publish(task)
-  taskBoard.claim(task.id, `worker-${task.blueprint.role}`)
+  // 1. Publish task via REST API
+  await client.publishTask(task)
+
+  // 2. Claim task via REST API
+  await client.claimTask(task.id, `worker-${task.blueprint.role}`)
+
+  // 3. Execute locally (Mastra Agent placeholder)
   const result = await executor.execute(task)
-  taskBoard.submit(task.id, result)
-  taskBoard.verify(task.id)
+
+  // 4. Submit result via REST API
+  await client.submitTask(task.id, result)
+
+  // 5. Verify task via REST API
+  await client.verifyTask(task.id)
+
   return result
 }
 
@@ -134,136 +144,168 @@ const MISSION: Mission = {
 async function main() {
   console.log()
   console.log('╔══════════════════════════════════════════════════════╗')
-  console.log('║     SwarmFlow Quick Start — 3 Agent Debate          ║')
+  console.log('║   SwarmFlow Quick Start — 3 Agent Debate (REST API) ║')
   console.log('╚══════════════════════════════════════════════════════╝')
   console.log()
 
-  const swarmFlow = new SwarmFlow()
-  const taskBoard = new TaskBoard()
+  // ── Start Server ────────────────────────────────────────────
+  console.log('🚀 Starting SwarmFlow server...')
+  const server = await startServer({ port: 3210 })
+  const client = new SwarmFlowClient(server.baseUrl)
   const executor = new MastraExecutor()
-
-  // ── Step 1: Create Mission ──────────────────────────────────
-  console.log('📋 Creating mission:', MISSION.goal)
-  const record = swarmFlow.createMission(MISSION)
-  console.log(`   Mission ID: ${record.mission.id}`)
-  console.log(`   Status:     ${record.status}`)
+  console.log(`   Server running at ${server.baseUrl}`)
   console.log()
 
-  // ── Step 2: Phase 1 — Opening Statements (Parallel) ────────
-  console.log('═══ Phase 1: Opening Statements (Parallel) ═══')
-  console.log()
+  try {
+    // ── Health Check ────────────────────────────────────────────
+    const health = await client.health()
+    console.log(`   Health: ${health.status} (${health.timestamp})`)
+    console.log()
 
-  const openingResults: TaskResult[] = []
+    // ── Step 1: Create Mission via REST API ─────────────────────
+    console.log('📋 POST /api/missions — Creating mission')
+    const record = await client.createMission(MISSION)
+    console.log(`   Mission ID: ${MISSION.id}`)
+    console.log(`   Status:     ${record.status}`)
+    console.log()
 
-  for (let i = 0; i < MISSION.blueprints.length; i++) {
-    const bp = MISSION.blueprints[i]
-    const task = createTask(
-      `opening-${i}`,
-      MISSION,
-      'opening-statements',
-      i,
-      'Share your opening statement on AI regulation.',
-    )
-    const result = await executeTask(taskBoard, executor, task)
-    openingResults.push(result)
-    console.log(`  ✅ ${bp.role}: ${result.output.freeformAnalysis}`)
-  }
+    // ── Step 2: Phase 1 — Opening Statements (Parallel) ────────
+    console.log('═══ Phase 1: Opening Statements (Parallel) ═══')
+    console.log()
 
-  const digest1 = buildDigest(openingResults)
-  console.log()
-  console.log(`  📊 Digest: ${digest1.totalResults} results, avg confidence: ${digest1.averageConfidence.toFixed(2)}`)
-  console.log()
-
-  // ── Step 3: Phase 2 — Debate Rounds (Interactive) ──────────
-  console.log('═══ Phase 2: Debate Rounds (Interactive) ═══')
-  console.log()
-
-  const thread: InteractionThread = {
-    id: 'debate-thread-1',
-    missionId: MISSION.id,
-    postTaskId: 'opening-0',
-    postAuthor: MISSION.blueprints[0],
-    participants: MISSION.blueprints.slice(1),
-    rounds: [],
-    status: 'active',
-  }
-
-  let roundNumber = 0
-  let converged = false
-
-  while (!converged && roundNumber < 5) {
-    roundNumber++
-    console.log(`  ── Round ${roundNumber} ──`)
-
-    const roundResults: TaskResult[] = []
-    const roundTasks: Task[] = []
+    const openingResults: TaskResult[] = []
 
     for (let i = 0; i < MISSION.blueprints.length; i++) {
       const bp = MISSION.blueprints[i]
-      const task = createTask(
-        `debate-r${roundNumber}-${i}`,
+      const task = buildTask(
+        `opening-${i}`,
         MISSION,
-        'debate-rounds',
+        'opening-statements',
         i,
-        `Round ${roundNumber}: Respond to the debate. Consider the digest and previous arguments.`,
-        { threadId: thread.id, type: 'comment' },
+        'Share your opening statement on AI regulation.',
       )
-      const result = await executeTask(taskBoard, executor, task)
-      roundResults.push(result)
-      roundTasks.push(task)
+      console.log(`  📤 POST /api/tasks — Publishing task: ${task.id}`)
+      console.log(`  📥 POST /api/tasks/${task.id}/claim — Claiming as worker-${bp.role}`)
+      console.log(`  ⚙️  Executing locally via MastraExecutor...`)
+      const result = await executeTaskViaAPI(client, executor, task)
+      openingResults.push(result)
+      console.log(`  📤 POST /api/tasks/${task.id}/submit — Submitting result`)
+      console.log(`  ✅ POST /api/tasks/${task.id}/verify — Verified`)
+
+      // Query task status via REST API
+      const taskStatus = await client.getTask(task.id)
+      console.log(`  📊 GET /api/tasks/${task.id} — Status: ${taskStatus.status}`)
+      console.log(`     ${bp.role}: ${result.output.freeformAnalysis}`)
+      console.log()
+    }
+
+    const digest1 = buildDigest(openingResults)
+    console.log(`  📊 Digest: ${digest1.totalResults} results, avg confidence: ${digest1.averageConfidence.toFixed(2)}`)
+    console.log()
+
+    // ── Step 3: Phase 2 — Debate Rounds (Interactive) ──────────
+    console.log('═══ Phase 2: Debate Rounds (Interactive) ═══')
+    console.log()
+
+    const thread: InteractionThread = {
+      id: 'debate-thread-1',
+      missionId: MISSION.id,
+      postTaskId: 'opening-0',
+      postAuthor: MISSION.blueprints[0],
+      participants: MISSION.blueprints.slice(1),
+      rounds: [],
+      status: 'active',
+    }
+
+    let roundNumber = 0
+    let converged = false
+
+    while (!converged && roundNumber < 5) {
+      roundNumber++
+      console.log(`  ── Round ${roundNumber} ──`)
+
+      const roundResults: TaskResult[] = []
+      const roundTasks: Task[] = []
+
+      for (let i = 0; i < MISSION.blueprints.length; i++) {
+        const bp = MISSION.blueprints[i]
+        const task = buildTask(
+          `debate-r${roundNumber}-${i}`,
+          MISSION,
+          'debate-rounds',
+          i,
+          `Round ${roundNumber}: Respond to the debate. Consider the digest and previous arguments.`,
+          { threadId: thread.id, type: 'comment' },
+        )
+        const result = await executeTaskViaAPI(client, executor, task)
+        roundResults.push(result)
+        roundTasks.push(task)
+        console.log(`  ✅ ${bp.role}: ${result.output.freeformAnalysis}`)
+      }
+
+      thread.rounds.push({
+        roundNumber,
+        tasks: roundTasks,
+        results: roundResults,
+      })
+
+      converged = !mutualIntent.shouldThreadContinue(thread)
+      console.log(`  📊 Converged: ${converged}`)
+      console.log()
+    }
+
+    thread.status = 'converged'
+
+    // ── Step 4: Phase 3 — Closing Statements (Aggregate) ───────
+    console.log('═══ Phase 3: Closing Statements (Aggregate) ═══')
+    console.log()
+
+    const closingResults: TaskResult[] = []
+
+    for (let i = 0; i < MISSION.blueprints.length; i++) {
+      const bp = MISSION.blueprints[i]
+      const task = buildTask(
+        `closing-${i}`,
+        MISSION,
+        'closing-statements',
+        i,
+        'Provide your final stance considering all arguments presented.',
+      )
+      const result = await executeTaskViaAPI(client, executor, task)
+      closingResults.push(result)
       console.log(`  ✅ ${bp.role}: ${result.output.freeformAnalysis}`)
     }
 
-    thread.rounds.push({
-      roundNumber,
-      tasks: roundTasks,
-      results: roundResults,
-    })
+    // ── Query final mission status via REST API ──────────────────
+    console.log()
+    console.log('  📊 GET /api/missions — Querying mission status')
+    const finalMission = await client.getMission(MISSION.id)
+    console.log(`     Mission status: ${finalMission.status}`)
 
-    converged = !mutualIntent.shouldThreadContinue(thread)
-    console.log(`  📊 Converged: ${converged}`)
+    // ── Final Report ───────────────────────────────────────────
+    const allResults = [...openingResults, ...closingResults]
+    const finalDigest = buildDigest(allResults)
+
+    console.log()
+    console.log('╔══════════════════════════════════════════════════════╗')
+    console.log('║                   Final Report                       ║')
+    console.log('╚══════════════════════════════════════════════════════╝')
+    console.log(`  Total results:       ${finalDigest.totalResults}`)
+    console.log(`  Avg confidence:      ${finalDigest.averageConfidence.toFixed(2)}`)
+    console.log(`  Convergence rate:    ${(finalDigest.convergenceRate * 100).toFixed(0)}%`)
+    console.log(`  Key arguments:       ${finalDigest.keyArgumentsSummary.length}`)
+    console.log(`  Debate rounds:       ${roundNumber}`)
+    console.log(`  Mission status:      completed`)
+    console.log()
+    console.log('✨ Quick Start demo complete!')
+  } finally {
+    // ── Stop Server ───────────────────────────────────────────
+    console.log()
+    console.log('🛑 Shutting down server...')
+    await server.close()
+    console.log('   Server stopped.')
     console.log()
   }
-
-  thread.status = 'converged'
-
-  // ── Step 4: Phase 3 — Closing Statements (Aggregate) ───────
-  console.log('═══ Phase 3: Closing Statements (Aggregate) ═══')
-  console.log()
-
-  const closingResults: TaskResult[] = []
-
-  for (let i = 0; i < MISSION.blueprints.length; i++) {
-    const bp = MISSION.blueprints[i]
-    const task = createTask(
-      `closing-${i}`,
-      MISSION,
-      'closing-statements',
-      i,
-      'Provide your final stance considering all arguments presented.',
-    )
-    const result = await executeTask(taskBoard, executor, task)
-    closingResults.push(result)
-    console.log(`  ✅ ${bp.role}: ${result.output.freeformAnalysis}`)
-  }
-
-  // ── Final Report ───────────────────────────────────────────
-  const allResults = [...openingResults, ...closingResults]
-  const finalDigest = buildDigest(allResults)
-
-  console.log()
-  console.log('╔══════════════════════════════════════════════════════╗')
-  console.log('║                   Final Report                       ║')
-  console.log('╚══════════════════════════════════════════════════════╝')
-  console.log(`  Total results:       ${finalDigest.totalResults}`)
-  console.log(`  Avg confidence:      ${finalDigest.averageConfidence.toFixed(2)}`)
-  console.log(`  Convergence rate:    ${(finalDigest.convergenceRate * 100).toFixed(0)}%`)
-  console.log(`  Key arguments:       ${finalDigest.keyArgumentsSummary.length}`)
-  console.log(`  Debate rounds:       ${roundNumber}`)
-  console.log(`  Mission status:      completed`)
-  console.log()
-  console.log('✨ Quick Start demo complete!')
-  console.log()
 }
 
 main().catch(console.error)

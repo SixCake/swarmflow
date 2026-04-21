@@ -170,6 +170,136 @@ describe('API Integration Tests', () => {
       expiresAt: new Date(Date.now() + 3600000),
     }
 
+    // --- POST /api/tasks (Publish) ---
+
+    it('POST /api/tasks should publish a task', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/tasks',
+        payload: testTask,
+      })
+      expect(response.statusCode).toBe(201)
+      const body = JSON.parse(response.body)
+      expect(body.success).toBe(true)
+      expect(body.taskId).toBe('api-test-task')
+
+      // Verify task is now available
+      const task = taskBoard.getTask('api-test-task')
+      expect(task).toBeDefined()
+      expect(task!.status).toBe('published')
+    })
+
+    it('POST /api/tasks should reject missing fields', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/tasks',
+        payload: { type: 'test' },
+      })
+      expect(response.statusCode).toBe(400)
+    })
+
+    // --- POST /api/tasks/:id/verify ---
+
+    it('POST /api/tasks/:id/verify should verify a submitted task', async () => {
+      taskBoard.publish({ ...testTask })
+      taskBoard.claim('api-test-task', 'worker-1')
+      taskBoard.submit('api-test-task', {
+        output: { freeformAnalysis: 'Done', score: 0.9 },
+        metadata: {
+          wantsContinue: false,
+          confidence: 0.95,
+          executionTimeMs: 50,
+          agentFramework: 'mastra',
+        },
+      })
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/tasks/api-test-task/verify',
+      })
+      expect(response.statusCode).toBe(200)
+      const body = JSON.parse(response.body)
+      expect(body.success).toBe(true)
+      expect(body.taskId).toBe('api-test-task')
+
+      // Verify task status is now 'verified'
+      const task = taskBoard.getTask('api-test-task')
+      expect(task!.status).toBe('verified')
+    })
+
+    it('POST /api/tasks/:id/verify should return 409 for non-submitted task', async () => {
+      taskBoard.publish({ ...testTask })
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/tasks/api-test-task/verify',
+      })
+      expect(response.statusCode).toBe(409)
+    })
+
+    // --- Full lifecycle via API ---
+
+    it('should support full task lifecycle: publish → claim → submit → verify → get', async () => {
+      // 1. Publish
+      const publishRes = await app.inject({
+        method: 'POST',
+        url: '/api/tasks',
+        payload: testTask,
+      })
+      expect(publishRes.statusCode).toBe(201)
+
+      // 2. Get available
+      const availableRes = await app.inject({
+        method: 'GET',
+        url: '/api/tasks/available',
+      })
+      expect(JSON.parse(availableRes.body)).toHaveLength(1)
+
+      // 3. Claim
+      const claimRes = await app.inject({
+        method: 'POST',
+        url: '/api/tasks/api-test-task/claim',
+        payload: { workerId: 'worker-1' },
+      })
+      expect(claimRes.statusCode).toBe(200)
+
+      // 4. Submit
+      const submitRes = await app.inject({
+        method: 'POST',
+        url: '/api/tasks/api-test-task/submit',
+        payload: {
+          result: {
+            output: { freeformAnalysis: 'Lifecycle test', score: 0.8 },
+            metadata: {
+              wantsContinue: false,
+              confidence: 0.9,
+              executionTimeMs: 75,
+              agentFramework: 'mastra',
+            },
+          },
+        },
+      })
+      expect(submitRes.statusCode).toBe(200)
+
+      // 5. Verify
+      const verifyRes = await app.inject({
+        method: 'POST',
+        url: '/api/tasks/api-test-task/verify',
+      })
+      expect(verifyRes.statusCode).toBe(200)
+
+      // 6. Get final state
+      const getRes = await app.inject({
+        method: 'GET',
+        url: '/api/tasks/api-test-task',
+      })
+      expect(getRes.statusCode).toBe(200)
+      const finalTask = JSON.parse(getRes.body)
+      expect(finalTask.status).toBe('verified')
+      expect(finalTask.result.output.freeformAnalysis).toBe('Lifecycle test')
+    })
+
+    // --- Existing tests ---
+
     it('GET /api/tasks/available should return available tasks', async () => {
       taskBoard.publish({ ...testTask })
       const response = await app.inject({

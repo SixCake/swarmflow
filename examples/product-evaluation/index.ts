@@ -1,16 +1,16 @@
 #!/usr/bin/env npx tsx
 /**
- * SwarmFlow Product Evaluation — Multi-Dimensional Assessment Space
+ * SwarmFlow Product Evaluation — Multi-Dimensional Assessment Space (via REST API)
  *
- * Demonstrates a 5-agent product evaluation workflow where specialized evaluators
- * assess a product from different dimensions, discuss trade-offs, and produce
- * a unified evaluation report.
+ * Demonstrates a 5-agent product evaluation workflow through HTTP REST API where
+ * specialized evaluators assess a product from different dimensions, discuss
+ * trade-offs, and produce a unified evaluation report.
  *
  * Usage: npx tsx examples/product-evaluation/index.ts
  */
 
-import { SwarmFlow } from '../../src/swarm-flow.js'
-import { TaskBoard } from '../../src/core/task-board.js'
+import { startServer } from '../shared/server-helper.js'
+import { SwarmFlowClient } from '../shared/api-client.js'
 import { MastraExecutor } from '../../src/worker/mastra-executor.js'
 import { buildDigest } from '../../src/core/digest.js'
 import { fixedRounds } from '../../src/core/convergence.js'
@@ -19,9 +19,9 @@ import type { Task } from '../../src/types/task.types.js'
 import type { TaskResult } from '../../src/types/result.types.js'
 import type { InteractionThread } from '../../src/types/thread.types.js'
 
-// ─── Helper: create a task from blueprint ────────────────────
+// ─── Helper: create a task object ────────────────────────────
 
-function createTask(
+function buildTask(
   id: string,
   mission: Mission,
   phaseId: string,
@@ -46,18 +46,18 @@ function createTask(
   }
 }
 
-// ─── Helper: execute a task through full lifecycle ───────────
+// ─── Helper: execute a task through full REST API lifecycle ──
 
-async function executeTask(
-  taskBoard: TaskBoard,
+async function executeTaskViaAPI(
+  client: SwarmFlowClient,
   executor: MastraExecutor,
   task: Task,
 ): Promise<TaskResult> {
-  taskBoard.publish(task)
-  taskBoard.claim(task.id, `worker-${task.blueprint.role}`)
+  await client.publishTask(task)
+  await client.claimTask(task.id, `worker-${task.blueprint.role}`)
   const result = await executor.execute(task)
-  taskBoard.submit(task.id, result)
-  taskBoard.verify(task.id)
+  await client.submitTask(task.id, result)
+  await client.verifyTask(task.id)
   return result
 }
 
@@ -205,201 +205,215 @@ const MISSION: Mission = {
 
 async function main() {
   console.log()
-  console.log('╔══════════════════════════════════════════════════════════╗')
-  console.log('║  SwarmFlow Product Evaluation — Multi-Dimensional Space ║')
-  console.log('╚══════════════════════════════════════════════════════════╝')
+  console.log('╔══════════════════════════════════════════════════════════════╗')
+  console.log('║  SwarmFlow Product Evaluation — Multi-Dimensional (REST API) ║')
+  console.log('╚══════════════════════════════════════════════════════════════╝')
   console.log()
 
-  const swarmFlow = new SwarmFlow()
-  const taskBoard = new TaskBoard()
+  // ── Start Server ────────────────────────────────────────────
+  console.log('🚀 Starting SwarmFlow server...')
+  const server = await startServer({ port: 3212 })
+  const client = new SwarmFlowClient(server.baseUrl)
   const executor = new MastraExecutor()
   const convergencePolicy = fixedRounds(2)
-
-  // ── Step 1: Create Mission ──────────────────────────────────
-  console.log(`📋 Product: ${PRODUCT.name} v${PRODUCT.version}`)
-  console.log(`   Category: ${PRODUCT.category}`)
-  console.log(`   Target: ${PRODUCT.targetMarket}`)
+  console.log(`   Server running at ${server.baseUrl}`)
   console.log()
 
-  const record = swarmFlow.createMission(MISSION)
-  console.log(`   Mission ID: ${record.mission.id}`)
-  console.log(`   Status:     ${record.status}`)
-  console.log()
-
-  console.log('📊 Evaluation Dimensions:')
-  for (const dim of DIMENSIONS) {
-    console.log(`   • ${dim.dimension} (weight: ${(dim.weight * 100).toFixed(0)}%) — ${dim.role}`)
-  }
-  console.log()
-
-  // ── Step 2: Phase 1 — Independent Assessment (Parallel) ────
-  console.log('═══ Phase 1: Independent Assessment (Parallel) ═══')
-  console.log()
-
-  const assessmentResults: TaskResult[] = []
-
-  for (let i = 0; i < MISSION.blueprints.length; i++) {
-    const bp = MISSION.blueprints[i]
-    const dim = DIMENSIONS[i]
-    const task = createTask(
-      `assess-${bp.role}`,
-      MISSION,
-      'independent-assessment',
-      i,
-      `Assess ${PRODUCT.name} from the ${dim.dimension} perspective. ` +
-      `Score each criterion 1-10 and provide an overall dimension score.`,
-    )
-    const result = await executeTask(taskBoard, executor, task)
-    assessmentResults.push(result)
-    console.log(`  ✅ ${dim.dimension}:`)
-    console.log(`     Score: ${result.output.score ?? 'N/A'}/10 | Confidence: ${(result.metadata.confidence * 100).toFixed(0)}%`)
-    console.log(`     Finding: ${result.output.freeformAnalysis}`)
+  try {
+    // ── Step 1: Create Mission via REST API ─────────────────────
+    console.log(`📋 Product: ${PRODUCT.name} v${PRODUCT.version}`)
+    console.log(`   Category: ${PRODUCT.category}`)
+    console.log(`   Target: ${PRODUCT.targetMarket}`)
     console.log()
-  }
 
-  const assessDigest = buildDigest(assessmentResults)
-  console.log(`  📊 Assessment Digest: ${assessDigest.totalResults} dimensions evaluated`)
-  console.log(`     Avg confidence: ${assessDigest.averageConfidence.toFixed(2)}`)
-  console.log()
+    console.log('📋 POST /api/missions — Creating evaluation mission')
+    const record = await client.createMission(MISSION)
+    console.log(`   Mission ID: ${MISSION.id}`)
+    console.log(`   Status:     ${record.status}`)
+    console.log()
 
-  // ── Step 3: Phase 2 — Cross-Dimension Discussion (Interactive, 2 Fixed Rounds) ──
-  console.log('═══ Phase 2: Cross-Dimension Discussion (2 Fixed Rounds) ═══')
-  console.log()
+    console.log('📊 Evaluation Dimensions:')
+    for (const dim of DIMENSIONS) {
+      console.log(`   • ${dim.dimension} (weight: ${(dim.weight * 100).toFixed(0)}%) — ${dim.role}`)
+    }
+    console.log()
 
-  const thread: InteractionThread = {
-    id: 'eval-discussion-1',
-    missionId: MISSION.id,
-    postTaskId: `assess-${MISSION.blueprints[0].role}`,
-    postAuthor: MISSION.blueprints[0],
-    participants: MISSION.blueprints.slice(1),
-    rounds: [],
-    status: 'active',
-  }
+    // ── Step 2: Phase 1 — Independent Assessment (Parallel) ────
+    console.log('═══ Phase 1: Independent Assessment (Parallel) ═══')
+    console.log()
 
-  let roundNumber = 0
-  let shouldContinue = true
-
-  while (shouldContinue) {
-    roundNumber++
-    const roundInstructions = roundNumber === 1
-      ? 'Share your key findings and identify potential conflicts with other dimensions. ' +
-        'Where do trade-offs exist between your dimension and others?'
-      : 'Resolve identified trade-offs. Adjust your assessment if other dimensions revealed important considerations. ' +
-        'Align on priority recommendations.'
-
-    console.log(`  ── Discussion Round ${roundNumber} ──`)
-
-    const roundResults: TaskResult[] = []
-    const roundTasks: Task[] = []
+    const assessmentResults: TaskResult[] = []
 
     for (let i = 0; i < MISSION.blueprints.length; i++) {
       const bp = MISSION.blueprints[i]
       const dim = DIMENSIONS[i]
-      const task = createTask(
-        `discuss-r${roundNumber}-${bp.role}`,
+      const task = buildTask(
+        `assess-${bp.role}`,
         MISSION,
-        'cross-dimension-discussion',
+        'independent-assessment',
         i,
-        `Round ${roundNumber} (${dim.dimension}): ${roundInstructions}`,
-        { threadId: thread.id, type: 'trade_off_discussion' },
+        `Assess ${PRODUCT.name} from the ${dim.dimension} perspective. ` +
+        `Score each criterion 1-10 and provide an overall dimension score.`,
       )
-      const result = await executeTask(taskBoard, executor, task)
-      roundResults.push(result)
-      roundTasks.push(task)
-      console.log(`  ✅ ${dim.dimension}: ${result.output.freeformAnalysis}`)
+      console.log(`  📤 POST /api/tasks → POST /claim → Execute → POST /submit → POST /verify`)
+      const result = await executeTaskViaAPI(client, executor, task)
+      assessmentResults.push(result)
+      console.log(`  ✅ ${dim.dimension}: Score ${result.output.score ?? 'N/A'}/10 | ${result.output.freeformAnalysis}`)
+      console.log()
     }
 
-    thread.rounds.push({
-      roundNumber,
-      tasks: roundTasks,
-      results: roundResults,
-    })
+    const assessDigest = buildDigest(assessmentResults)
+    console.log(`  📊 Assessment Digest: ${assessDigest.totalResults} dimensions evaluated`)
+    console.log(`     Avg confidence: ${assessDigest.averageConfidence.toFixed(2)}`)
+    console.log()
 
-    shouldContinue = convergencePolicy.shouldThreadContinue(thread)
-    console.log(`  📊 Continue discussion: ${shouldContinue}`)
+    // ── Step 3: Phase 2 — Cross-Dimension Discussion (Interactive, 2 Fixed Rounds) ──
+    console.log('═══ Phase 2: Cross-Dimension Discussion (2 Fixed Rounds) ═══')
+    console.log()
+
+    const thread: InteractionThread = {
+      id: 'eval-discussion-1',
+      missionId: MISSION.id,
+      postTaskId: `assess-${MISSION.blueprints[0].role}`,
+      postAuthor: MISSION.blueprints[0],
+      participants: MISSION.blueprints.slice(1),
+      rounds: [],
+      status: 'active',
+    }
+
+    let roundNumber = 0
+    let shouldContinue = true
+
+    while (shouldContinue) {
+      roundNumber++
+      const roundInstructions = roundNumber === 1
+        ? 'Share your key findings and identify potential conflicts with other dimensions. ' +
+          'Where do trade-offs exist between your dimension and others?'
+        : 'Resolve identified trade-offs. Adjust your assessment if other dimensions revealed important considerations. ' +
+          'Align on priority recommendations.'
+
+      console.log(`  ── Discussion Round ${roundNumber} ──`)
+
+      const roundResults: TaskResult[] = []
+      const roundTasks: Task[] = []
+
+      for (let i = 0; i < MISSION.blueprints.length; i++) {
+        const bp = MISSION.blueprints[i]
+        const dim = DIMENSIONS[i]
+        const task = buildTask(
+          `discuss-r${roundNumber}-${bp.role}`,
+          MISSION,
+          'cross-dimension-discussion',
+          i,
+          `Round ${roundNumber} (${dim.dimension}): ${roundInstructions}`,
+          { threadId: thread.id, type: 'trade_off_discussion' },
+        )
+        const result = await executeTaskViaAPI(client, executor, task)
+        roundResults.push(result)
+        roundTasks.push(task)
+        console.log(`  ✅ ${dim.dimension}: ${result.output.freeformAnalysis}`)
+      }
+
+      thread.rounds.push({
+        roundNumber,
+        tasks: roundTasks,
+        results: roundResults,
+      })
+
+      shouldContinue = convergencePolicy.shouldThreadContinue(thread)
+      console.log(`  📊 Continue discussion: ${shouldContinue}`)
+      console.log()
+    }
+
+    thread.status = 'converged'
+
+    // ── Step 4: Phase 3 — Unified Report (Aggregate) ──────────
+    console.log('═══ Phase 3: Unified Report (Aggregate) ═══')
+    console.log()
+
+    const finalResults: TaskResult[] = []
+
+    for (let i = 0; i < MISSION.blueprints.length; i++) {
+      const bp = MISSION.blueprints[i]
+      const dim = DIMENSIONS[i]
+      const task = buildTask(
+        `final-${bp.role}`,
+        MISSION,
+        'unified-report',
+        i,
+        `Provide your final ${dim.dimension} assessment for ${PRODUCT.name}, ` +
+        `incorporating insights from the cross-dimension discussion.`,
+      )
+      const result = await executeTaskViaAPI(client, executor, task)
+      finalResults.push(result)
+      console.log(`  ✅ ${dim.dimension}: Score ${result.output.score ?? 'N/A'}/10 | ${result.output.freeformAnalysis}`)
+      console.log()
+    }
+
+    // ── Query mission status via REST API ────────────────────────
+    console.log('  📊 GET /api/missions — Querying mission status')
+    const finalMission = await client.getMission(MISSION.id)
+    console.log(`     Mission status: ${finalMission.status}`)
+
+    // ── Final Report ───────────────────────────────────────────
+    const allResults = [...assessmentResults, ...finalResults]
+    const finalDigest = buildDigest(allResults)
+
+    // Calculate weighted score
+    let weightedScore = 0
+    for (let i = 0; i < finalResults.length; i++) {
+      const score = finalResults[i].output.score ?? 5
+      weightedScore += score * DIMENSIONS[i].weight
+    }
+
+    console.log()
+    console.log('╔══════════════════════════════════════════════════════════════╗')
+    console.log('║              Product Evaluation Final Report                  ║')
+    console.log('╚══════════════════════════════════════════════════════════════╝')
+    console.log()
+    console.log(`  Product:             ${PRODUCT.name} v${PRODUCT.version}`)
+    console.log(`  Category:            ${PRODUCT.category}`)
+    console.log(`  Target Market:       ${PRODUCT.targetMarket}`)
+    console.log()
+
+    console.log('  ── Dimension Scores ──')
+    for (let i = 0; i < DIMENSIONS.length; i++) {
+      const dim = DIMENSIONS[i]
+      const score = finalResults[i].output.score ?? 'N/A'
+      const bar = typeof score === 'number' ? '█'.repeat(score) + '░'.repeat(10 - score) : '??????????'
+      console.log(`  ${dim.dimension.padEnd(28)} ${bar} ${score}/10 (weight: ${(dim.weight * 100).toFixed(0)}%)`)
+    }
+    console.log()
+
+    console.log('  ── Summary ──')
+    console.log(`  Total assessments:   ${finalDigest.totalResults}`)
+    console.log(`  Avg confidence:      ${finalDigest.averageConfidence.toFixed(2)}`)
+    console.log(`  Convergence rate:    ${(finalDigest.convergenceRate * 100).toFixed(0)}%`)
+    console.log(`  Key findings:        ${finalDigest.keyArgumentsSummary.length}`)
+    console.log(`  Discussion rounds:   ${roundNumber}`)
+    console.log()
+
+    // Determine recommendation
+    const recommendation =
+      weightedScore >= 8.0 ? '✅ STRONGLY RECOMMEND' :
+      weightedScore >= 6.5 ? '✅ RECOMMEND' :
+      weightedScore >= 5.0 ? '⚠️  RECOMMEND WITH RESERVATIONS' :
+      weightedScore >= 3.5 ? '⚠️  NOT RECOMMENDED (needs improvement)' :
+      '❌ DO NOT RECOMMEND'
+
+    console.log(`  ══════════════════════════════════════════`)
+    console.log(`  Weighted Score:      ${weightedScore.toFixed(1)}/10`)
+    console.log(`  Recommendation:      ${recommendation}`)
+    console.log(`  ══════════════════════════════════════════`)
+    console.log()
+    console.log('✨ Product evaluation complete!')
+  } finally {
+    console.log()
+    console.log('🛑 Shutting down server...')
+    await server.close()
+    console.log('   Server stopped.')
     console.log()
   }
-
-  thread.status = 'converged'
-
-  // ── Step 4: Phase 3 — Unified Report (Aggregate) ──────────
-  console.log('═══ Phase 3: Unified Report (Aggregate) ═══')
-  console.log()
-
-  const finalResults: TaskResult[] = []
-
-  for (let i = 0; i < MISSION.blueprints.length; i++) {
-    const bp = MISSION.blueprints[i]
-    const dim = DIMENSIONS[i]
-    const task = createTask(
-      `final-${bp.role}`,
-      MISSION,
-      'unified-report',
-      i,
-      `Provide your final ${dim.dimension} assessment for ${PRODUCT.name}, ` +
-      `incorporating insights from the cross-dimension discussion.`,
-    )
-    const result = await executeTask(taskBoard, executor, task)
-    finalResults.push(result)
-    console.log(`  ✅ ${dim.dimension}:`)
-    console.log(`     Final Score: ${result.output.score ?? 'N/A'}/10 | Confidence: ${(result.metadata.confidence * 100).toFixed(0)}%`)
-    console.log(`     Verdict: ${result.output.freeformAnalysis}`)
-    console.log()
-  }
-
-  // ── Final Report ───────────────────────────────────────────
-  const allResults = [...assessmentResults, ...finalResults]
-  const finalDigest = buildDigest(allResults)
-
-  // Calculate weighted score
-  let weightedScore = 0
-  for (let i = 0; i < finalResults.length; i++) {
-    const score = finalResults[i].output.score ?? 5
-    weightedScore += score * DIMENSIONS[i].weight
-  }
-
-  console.log()
-  console.log('╔══════════════════════════════════════════════════════════╗')
-  console.log('║            Product Evaluation Final Report               ║')
-  console.log('╚══════════════════════════════════════════════════════════╝')
-  console.log()
-  console.log(`  Product:             ${PRODUCT.name} v${PRODUCT.version}`)
-  console.log(`  Category:            ${PRODUCT.category}`)
-  console.log(`  Target Market:       ${PRODUCT.targetMarket}`)
-  console.log()
-
-  console.log('  ── Dimension Scores ──')
-  for (let i = 0; i < DIMENSIONS.length; i++) {
-    const dim = DIMENSIONS[i]
-    const score = finalResults[i].output.score ?? 'N/A'
-    const bar = typeof score === 'number' ? '█'.repeat(score) + '░'.repeat(10 - score) : '??????????'
-    console.log(`  ${dim.dimension.padEnd(28)} ${bar} ${score}/10 (weight: ${(dim.weight * 100).toFixed(0)}%)`)
-  }
-  console.log()
-
-  console.log('  ── Summary ──')
-  console.log(`  Total assessments:   ${finalDigest.totalResults}`)
-  console.log(`  Avg confidence:      ${finalDigest.averageConfidence.toFixed(2)}`)
-  console.log(`  Convergence rate:    ${(finalDigest.convergenceRate * 100).toFixed(0)}%`)
-  console.log(`  Key findings:        ${finalDigest.keyArgumentsSummary.length}`)
-  console.log(`  Discussion rounds:   ${roundNumber}`)
-  console.log()
-
-  // Determine recommendation
-  const recommendation =
-    weightedScore >= 8.0 ? '✅ STRONGLY RECOMMEND' :
-    weightedScore >= 6.5 ? '✅ RECOMMEND' :
-    weightedScore >= 5.0 ? '⚠️  RECOMMEND WITH RESERVATIONS' :
-    weightedScore >= 3.5 ? '⚠️  NOT RECOMMENDED (needs improvement)' :
-    '❌ DO NOT RECOMMEND'
-
-  console.log(`  ══════════════════════════════════════════`)
-  console.log(`  Weighted Score:      ${weightedScore.toFixed(1)}/10`)
-  console.log(`  Recommendation:      ${recommendation}`)
-  console.log(`  ══════════════════════════════════════════`)
-  console.log()
-  console.log('✨ Product evaluation complete!')
-  console.log()
 }
 
 main().catch(console.error)
