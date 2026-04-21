@@ -12,6 +12,7 @@ import { registerTaskRoutes } from './routes/task.routes.js'
 import { registerTerminalRoutes } from './routes/terminal.routes.js'
 import { registerCommentRoutes } from './routes/comment.routes.js'
 import { registerThreadRoutes } from './routes/thread.routes.js'
+import { registerDashboardRoutes } from './routes/dashboard.routes.js'
 import { MissionManager } from '../core/mission-manager.js'
 import { TaskBoard } from '../core/task-board.js'
 import { DAGEngine } from '../core/dag-engine.js'
@@ -49,7 +50,12 @@ export async function createApp(
 
   // Register auth middleware (if token provided) — with terminal registry for dual-mode auth
   if (config.auth?.token) {
-    registerAuth(app, config.auth, terminalRegistry)
+    const dashboardExcludes = ['/health', '/dashboard']
+    const existingExcludes = config.auth.excludePaths ?? []
+    registerAuth(app, {
+      ...config.auth,
+      excludePaths: [...new Set([...existingExcludes, ...dashboardExcludes])],
+    }, terminalRegistry)
   }
 
   // Health check (always available, no auth)
@@ -63,6 +69,7 @@ export async function createApp(
   registerTerminalRoutes(app, terminalRegistry)
   registerCommentRoutes(app, commentBoard)
   registerThreadRoutes(app, dagEngine)
+  registerDashboardRoutes(app, missionManager, taskBoard, terminalRegistry, dagEngine)
 
   // Global error handler
   app.setErrorHandler((error, _request, reply) => {

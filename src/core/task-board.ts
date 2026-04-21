@@ -284,6 +284,10 @@ export class TaskBoard {
 
   // ─── Queries ────────────────────────────────────────────
 
+  listAll(): Task[] {
+    return [...this.tasks.values()]
+  }
+
   getTask(taskId: string): Task | undefined {
     return this.tasks.get(taskId)
   }

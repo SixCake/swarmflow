@@ -126,6 +126,13 @@ export class TerminalRegistry {
   }
 
   /**
+   * Get all registered terminals.
+   */
+  listAll(): TerminalIdentity[] {
+    return [...this.terminals.values()]
+  }
+
+  /**
    * Get total registered terminal count.
    */
   getTerminalCount(): number {
@@ -147,15 +154,18 @@ export function registerAuth(
   config: AuthConfig,
   terminalRegistry?: TerminalRegistry
 ): void {
-  const excludePaths = new Set(config.excludePaths ?? ['/health'])
+  const excludePaths = config.excludePaths ?? ['/health']
 
   // Decorate request so downstream routes can access terminal identity
   app.decorateRequest('terminalIdentity', null)
 
   app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
-    // Skip auth for excluded paths
+    // Skip auth for excluded paths (supports both exact match and prefix match)
     const urlPath = request.url.split('?')[0]
-    if (excludePaths.has(urlPath)) {
+    const isExcluded = excludePaths.some(pattern =>
+      urlPath === pattern || urlPath.startsWith(pattern + '/')
+    )
+    if (isExcluded) {
       return
     }
 
