@@ -22,7 +22,13 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
-    "demo": "tsx examples/product-evaluation.ts"
+    "demo": "tsx examples/product-evaluation/index.ts",
+    "demo:quick-start": "tsx examples/quick-start/index.ts",
+    "demo:code-review": "tsx examples/code-review/index.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "peerDependencies": {
     "@mastra/core": ">=0.10.0"

@@ -189,8 +189,13 @@ export class WorkerThread {
       headers: this.buildHeaders(),
     })
     if (!response.ok) return []
-    const data = await response.json() as { tasks: Task[] }
-    return data.tasks ?? []
+    const data = await response.json()
+    // API returns either a plain array or { tasks: [...] }
+    if (Array.isArray(data)) return data as Task[]
+    if (data && Array.isArray((data as Record<string, unknown>).tasks)) {
+      return (data as { tasks: Task[] }).tasks
+    }
+    return []
   }
 
   private async claimTask(taskId: string): Promise<boolean> {

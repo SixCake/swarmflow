@@ -1,0 +1,35 @@
+# Source files (distributed as compiled JS)
+src/
+
+# Tests
+tests/
+
+# Documentation
+docs/
+
+# Examples
+examples/
+
+# GitHub
+.github/
+
+# Config files
+.gitignore
+tsconfig.json
+vitest.config.ts
+
+# Development files
+.aone_copilot/
+.context/
+*.test.ts
+*.test.js
+*.spec.ts
+*.spec.js
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

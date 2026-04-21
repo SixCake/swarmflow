@@ -20,6 +20,8 @@ export {
 } from './core/convergence.js'
 export type { ConvergenceConfig } from './core/convergence.js'
 export { MemoryStorage } from './storage/memory-storage.js'
+export { FileStorage } from './storage/sqlite-storage.js'
+export type { FileStorageConfig } from './storage/sqlite-storage.js'
 export type { StorageProvider, MissionRecord as StorageMissionRecord } from './storage/storage.interface.js'
 export { WorkerPool } from './worker/worker-pool.js'
 export { MastraExecutor } from './worker/mastra-executor.js'

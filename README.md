@@ -10,30 +10,32 @@ SwarmFlow is an open-source distributed AI Agent task orchestration framework bu
 
 ## Core Features
 
-- **Pure AI Agent Execution** - All task execution is driven by AI Agents, no manual intervention
-- **Dynamic DAG Orchestration** - Automatically constructs and adjusts execution graphs based on task dependencies
-- **Hyper-Scale Support** - Designed for millions of concurrent agents and tasks
-- **Hybrid Hub Architecture** - Combines centralized coordination with decentralized execution
-- **No Long-Running Connections** - Stateless design enables horizontal scaling without WebSocket overhead
-- **Terminal Autonomous Decision** - Agents make execution decisions independently at the edge
-- **Mastra Native** - Built on Mastra's powerful Agent framework for seamless integration
+- **Pure AI Agent Execution** — All task execution is driven by AI Agents, no manual intervention
+- **Dynamic DAG Orchestration** — Automatically constructs and adjusts execution graphs based on task dependencies
+- **Multi-Phase Workflow** — Supports parallel, interactive (debate), and aggregate phases
+- **6 Convergence Strategies** — mutualIntent, bothAgree, fixedRounds, consensus, stability, hybrid + custom
+- **Aggregation Engine** — Stance clustering (Jaccard + hierarchical), conflict analysis, guidance signals, layered reports
+- **Security Hardening** — Context sanitization, prompt injection detection, anti-poisoning, audit logging
+- **Hybrid Hub Architecture** — Combines centralized coordination with decentralized execution
+- **No Long-Running Connections** — Stateless REST API enables horizontal scaling
+- **Mastra Native** — Built on Mastra's powerful Agent framework for seamless integration
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                      Mission Layer                           │
-│  (Mission Definition, Agent Blueprint, Convergence Rules)   │
+│  Mission Definition · Agent Blueprint · Convergence Rules   │
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                    Orchestration Layer                       │
-│  (DAG Engine, Task Board, Schema Validator, Convergence)    │
+│  DAG Engine · Task Board · Schema Validator · Convergence   │
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                     Execution Layer                          │
-│  (Worker Pool, Mastra Executor, Storage, Checkpointing)     │
+│  Worker Pool · Mastra Executor · Storage · Security         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -45,58 +47,135 @@ SwarmFlow is an open-source distributed AI Agent task orchestration framework bu
 npm install swarm-flow
 ```
 
-### Basic Example
-
-Create a mission with 3 Mastra Agents debating a topic:
+### Basic Usage (Programmatic API)
 
 ```typescript
-import { SwarmFlow } from 'swarm-flow';
-import { Agent } from '@mastra/core';
+import { SwarmFlow } from 'swarm-flow'
+import type { Mission } from 'swarm-flow'
 
-// Define 3 Mastra Agents
-const moderatorAgent = new Agent({
-  name: 'moderator',
-  instructions: 'You are the moderator. Guide the debate and ensure all viewpoints are heard.'
-});
+const swarm = new SwarmFlow({ port: 3000 })
 
-const proponentAgent = new Agent({
-  name: 'proponent',
-  instructions: 'You argue in favor of the proposition with strong evidence.'
-});
-
-const opponentAgent = new Agent({
-  name: 'opponent',
-  instructions: 'You argue against the proposition with counterarguments.'
-});
-
-// Create SwarmFlow instance
-const swarmFlow = new SwarmFlow();
-
-// Define mission
-const mission = await swarmFlow.createMission({
-  name: 'AI Safety Debate',
-  topic: 'Should AI development be regulated?',
-  agents: [
-    moderatorAgent,
-    proponentAgent,
-    opponentAgent
+const mission: Mission = {
+  id: 'debate-1',
+  goal: 'Evaluate whether AI development should be regulated',
+  agentBlueprints: [
+    { role: 'proponent', instructions: 'Argue in favor of regulation' },
+    { role: 'opponent', instructions: 'Argue against regulation' },
+    { role: 'moderator', instructions: 'Synthesize both viewpoints' },
   ],
-  convergenceRules: {
-    maxRounds: 5,
-    consensusThreshold: 0.8
-  }
-});
+  phases: [
+    { id: 'phase-1', type: 'parallel', blueprintRoles: ['proponent', 'opponent', 'moderator'], transitionRule: { type: 'all_completed' } },
+    { id: 'phase-2', type: 'interactive', blueprintRoles: ['proponent', 'opponent'], transitionRule: { type: 'convergence' } },
+    { id: 'phase-3', type: 'aggregate', blueprintRoles: ['moderator'], transitionRule: { type: 'all_completed' } },
+  ],
+  convergencePolicy: { strategy: 'consensus', maxRounds: 5, consensusThreshold: 0.8 },
+}
 
-// Execute mission
-const result = await swarmFlow.executeMission(mission.id);
+// Start mission (launches server + workers)
+const record = await swarm.start(mission)
 
-console.log('Debate Result:', result);
+// Run orchestration loop
+await swarm.run(record.id)
+
+// Stop everything
+await swarm.stop()
 ```
+
+### REST API Usage
+
+SwarmFlow exposes a full REST API for mission and task management:
+
+```bash
+# Create a mission
+curl -X POST http://localhost:3000/missions \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"m1","goal":"Evaluate AI regulation","agentBlueprints":[...],"phases":[...]}'
+
+# List available tasks
+curl http://localhost:3000/tasks/available \
+  -H "Authorization: Bearer <token>"
+
+# Claim a task
+curl -X POST http://localhost:3000/tasks/task-1/claim \
+  -H "Authorization: Bearer <token>" \
+  -d '{"workerId":"worker-1"}'
+
+# Submit result
+curl -X POST http://localhost:3000/tasks/task-1/submit \
+  -H "Authorization: Bearer <token>" \
+  -d '{"output":{...},"metadata":{...}}'
+```
+
+## API Reference
+
+### Core Classes
+
+| Class | Description |
+|-------|-------------|
+| `SwarmFlow` | Main orchestration class — start, run, stop missions |
+| `MissionManager` | Mission CRUD + status machine (created → running → completed) |
+| `TaskBoard` | Task state machine with atomic CAS claim, heartbeat, expiry |
+| `DAGEngine` | Phase orchestration — parallel, interactive, aggregate |
+| `SchemaValidator` | JSON Schema → Zod validation with caching |
+
+### Convergence Strategies
+
+| Strategy | Description |
+|----------|-------------|
+| `mutualIntent` | Both agents signal willingness to stop |
+| `bothAgree` | Both agents share the same stance |
+| `fixedRounds` | Fixed number of interaction rounds |
+| `consensus` | Dominant stance fraction exceeds threshold |
+| `stability` | Stance distribution change rate below threshold |
+| `hybrid` | Combines consensus + stability |
+
+### Aggregation Engine
+
+| Function | Description |
+|----------|-------------|
+| `buildDigest()` | Full aggregation: statistics + clustering + conflicts + guidance |
+| `generateReport()` | Layered report generation (5 layers, no LLM) |
+| `renderReportMarkdown()` | Render report as Markdown |
+
+### Security Modules
+
+| Module | Description |
+|--------|-------------|
+| `context-security` | PII removal, API key redaction, Unicode watermarking |
+| `prompt-defense` | Injection detection, instruction isolation, output safety |
+| `anti-poisoning` | Stance outliers, Sybil detection, cross-validation |
+| `audit` | Full audit logging with event sourcing and alerting |
+
+### Storage
+
+| Provider | Description |
+|----------|-------------|
+| `MemoryStorage` | In-memory (default, for development) |
+| `FileStorage` | JSON file persistence (for small deployments) |
+
+## Configuration
+
+```typescript
+const swarm = new SwarmFlow({
+  port: 3000,                    // HTTP server port
+  authToken: 'my-secret-token',  // Bearer token for API auth
+})
+```
+
+## Examples
+
+See the [examples/](examples/) directory for complete working examples:
+
+- **[quick-start](examples/quick-start/)** — Minimal 3-agent debate via REST API
+- **[code-review](examples/code-review/)** — Multi-agent code review workflow
+- **[product-evaluation](examples/product-evaluation/)** — Product evaluation with convergence
 
 ## Documentation
 
-- [Design Document](docs/swarm-flow-design.md) - Architecture and design decisions
-- [MVP Roadmap](docs/swarm-flow-mvp.md) - Minimum viable product features
+- [Design Document](docs/swarm-flow-design.md) — Architecture and design decisions
+- [Implementation Guide](docs/swarm-flow-design-implementation.md) — Detailed implementation plan
+- [MVP Roadmap](docs/swarm-flow-mvp.md) — Minimum viable product features
 
 ## Contributing
 
@@ -104,7 +183,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
 ## Code of Conduct
 
