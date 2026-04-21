@@ -21,6 +21,8 @@ export interface TerminalIdentity {
   registeredAt: Date
   lastActiveAt: Date
   isActive: boolean
+  capabilities: string[]
+  registeredFromIp: string
 }
 
 // ─── Terminal Registry ──────────────────────────────────────
@@ -39,7 +41,13 @@ export class TerminalRegistry {
    * Register a new terminal for an identity.
    * Returns the terminal identity or null if limit exceeded.
    */
-  register(terminalId: string, identityId: string, apiKey: string): TerminalIdentity | null {
+  register(
+    terminalId: string,
+    identityId: string,
+    apiKey: string,
+    capabilities: string[] = [],
+    registeredFromIp = 'unknown',
+  ): TerminalIdentity | null {
     // Check per-identity limit
     const existing = this.identityTerminals.get(identityId) ?? new Set()
     if (existing.size >= this.maxTerminalsPerIdentity && !existing.has(terminalId)) {
@@ -53,6 +61,8 @@ export class TerminalRegistry {
       registeredAt: new Date(),
       lastActiveAt: new Date(),
       isActive: true,
+      capabilities,
+      registeredFromIp,
     }
 
     this.terminals.set(terminalId, terminal)

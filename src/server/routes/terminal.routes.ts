@@ -22,7 +22,8 @@ export function registerTerminalRoutes(
     const terminalId = randomUUID()
     const apiKey = `sf-${randomUUID().replace(/-/g, '')}`
 
-    const terminal = registry.register(terminalId, identityId, apiKey)
+    const ipAddress = request.ip || 'unknown'
+    const terminal = registry.register(terminalId, identityId, apiKey, capabilities ?? [], ipAddress)
     if (!terminal) {
       reply.code(429).send({ error: 'Terminal limit exceeded for this identity' })
       return
@@ -32,7 +33,7 @@ export function registerTerminalRoutes(
       terminalId: terminal.terminalId,
       identityId: terminal.identityId,
       apiKey: terminal.apiKey,
-      capabilities: capabilities ?? [],
+      capabilities: terminal.capabilities,
       registeredAt: terminal.registeredAt.toISOString(),
     })
   })

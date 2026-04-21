@@ -5,7 +5,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import type { MissionManager } from '../../core/mission-manager.js'
 import type { TaskBoard } from '../../core/task-board.js'
-import type { TerminalRegistry } from '../middleware/auth.js'
+import type { TerminalRegistry, TerminalIdentity } from '../middleware/auth.js'
 import type { DAGEngine } from '../../core/dag-engine.js'
 import {
   DashboardAuth,
@@ -15,6 +15,7 @@ import {
   getClientIp,
 } from '../middleware/dashboard-auth.js'
 import type { DashboardAuthConfig } from '../middleware/dashboard-auth.js'
+import { randomUUID } from 'crypto'
 import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -140,8 +141,71 @@ export function registerDashboardRoutes(
 
   app.get('/dashboard/api/terminals', async (_request, reply) => {
     const terminals = terminalRegistry.listAll()
-    reply.send(terminals)
+    reply.send(terminals.map((t: TerminalIdentity) => ({
+      terminalId: t.terminalId,
+      identityId: t.identityId,
+      registeredAt: t.registeredAt.toISOString(),
+      lastActiveAt: t.lastActiveAt.toISOString(),
+      isActive: t.isActive,
+      capabilities: t.capabilities,
+      registeredFromIp: t.registeredFromIp,
+    })))
   })
+
+  // ─── Agent Management APIs ─────────────────────────────
+
+  app.post<{ Body: { identityId: string; capabilities?: string[] } }>(
+    '/dashboard/api/agents/register',
+    async (request, reply) => {
+      const { identityId, capabilities } = request.body ?? {}
+
+      if (!identityId || typeof identityId !== 'string' || identityId.trim().length === 0) {
+        reply.code(400).send({ error: 'Missing required field: identityId' })
+        return
+      }
+
+      const terminalId = randomUUID()
+      const apiKey = `sf-${randomUUID().replace(/-/g, '')}`
+      const ipAddress = getClientIp(request)
+      const cleanCapabilities = Array.isArray(capabilities)
+        ? capabilities.map(c => String(c).trim()).filter(Boolean)
+        : []
+
+      const terminal = terminalRegistry.register(
+        terminalId,
+        identityId.trim(),
+        apiKey,
+        cleanCapabilities,
+        ipAddress,
+      )
+
+      if (!terminal) {
+        reply.code(429).send({ error: 'Terminal limit exceeded for this identity' })
+        return
+      }
+
+      reply.code(201).send({
+        terminalId: terminal.terminalId,
+        identityId: terminal.identityId,
+        apiKey: terminal.apiKey,
+        capabilities: terminal.capabilities,
+        registeredAt: terminal.registeredAt.toISOString(),
+      })
+    },
+  )
+
+  app.delete<{ Params: { id: string } }>(
+    '/dashboard/api/agents/:id',
+    async (request, reply) => {
+      const { id } = request.params
+      const success = terminalRegistry.deactivate(id)
+      if (!success) {
+        reply.code(404).send({ error: 'Agent not found' })
+        return
+      }
+      reply.send({ success: true, terminalId: id })
+    },
+  )
 
   app.get('/dashboard/api/threads', async (_request, reply) => {
     const threads = dagEngine.getAllThreads()
