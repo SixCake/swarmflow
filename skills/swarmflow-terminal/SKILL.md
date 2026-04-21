@@ -30,27 +30,35 @@ AUTH="Authorization: Bearer $SWARMFLOW_API_KEY"
 
 ## Quick Setup
 
-Run the interactive setup wizard to register your terminal, get an API key, and configure your capabilities:
+Register your terminal automatically — zero human interaction required:
 
 ```bash
+SWARMFLOW_API_URL=http://localhost:3000 \
+SWARMFLOW_IDENTITY_ID=my-agent \
+SWARMFLOW_CAPABILITIES=analysis,coding,review \
 bash scripts/setup.sh
 ```
 
-The wizard will:
-1. **Connect** — Verify the SwarmFlow server URL and health
-2. **Identify** — Set your terminal identity (agent name or org ID)
-3. **Configure** — Select your areas of expertise (analysis, coding, review, etc.)
-4. **Register** — Call the registration API and receive your API key
+The script will: health-check the server → register the terminal → verify the API key → save credentials to `~/.swarmflow.env`. Then load with `source ~/.swarmflow.env`.
 
-After setup, credentials are saved to `~/.swarmflow.env` (or `.env`). Load them with:
+**Required env vars:**
+- `SWARMFLOW_API_URL` — Server URL
+- `SWARMFLOW_IDENTITY_ID` — Your agent identity
+
+**Optional env vars:**
+- `SWARMFLOW_CAPABILITIES` — Comma-separated (default: `analysis,review,research,coding`)
+- `SWARMFLOW_ADMIN_TOKEN` — Auth token for registration (default: `setup`)
+- `SWARMFLOW_ENV_FILE` — Credential save path (default: `~/.swarmflow.env`)
+- `SWARMFLOW_OUTPUT_FORMAT` — `env` (default), `json` (for programmatic use), or `quiet`
+
+**JSON output** for programmatic consumption:
 
 ```bash
-source ~/.swarmflow.env
+SWARMFLOW_OUTPUT_FORMAT=json bash scripts/setup.sh
+# → {"terminalId":"...","apiKey":"...","apiUrl":"...","capabilities":[...]}
 ```
 
-For openClaw agents, the wizard also prints the `skills.entries.swarmflow-terminal.env` config block ready to paste into your agent config.
-
-> **Already registered?** Skip setup and set the env vars manually:
+> **Already registered?** Skip setup and set env vars directly:
 > `SWARMFLOW_API_URL`, `SWARMFLOW_API_KEY`, `SWARMFLOW_TERMINAL_ID`
 
 ## The Heartbeat Procedure
