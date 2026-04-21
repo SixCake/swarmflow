@@ -8,8 +8,10 @@ export type { MissionRecord } from './core/mission-manager.js'
 export { TaskBoard } from './core/task-board.js'
 export { DAGEngine } from './core/dag-engine.js'
 export { SchemaValidator } from './core/schema-validator.js'
-export { buildDigest } from './core/digest.js'
-export type { AggregationDigest } from './core/digest.js'
+export { buildDigest, computeSimilarityMatrix, hierarchicalClustering, selectRepresentative, averageConfidence, analyzeConflicts, generateGuidanceSuggestions } from './core/digest.js'
+export type { AggregationDigest, ClusterInsight, ConflictReport, GuidanceSuggestion } from './core/digest.js'
+export { generateReport, renderReportMarkdown } from './core/report.js'
+export type { MissionReport } from './core/report.js'
 export {
   mutualIntent, bothAgree, fixedRounds,
   mutualIntentPolicy, bothAgreePolicy, fixedRoundsPolicy,
