@@ -135,12 +135,27 @@ export class TerminalRegistry {
 
 // ─── Middleware ──────────────────────────────────────────────
 
-export function registerAuth(app: FastifyInstance, config: AuthConfig): void {
+/**
+ * Dual-mode auth middleware.
+ * Mode 1: Global Bearer token (existing) — matches config.token
+ * Mode 2: Terminal API Key — validated via TerminalRegistry
+ * If either mode succeeds the request proceeds. Terminal auth decorates
+ * request with `terminalIdentity`.
+ */
+export function registerAuth(
+  app: FastifyInstance,
+  config: AuthConfig,
+  terminalRegistry?: TerminalRegistry
+): void {
   const excludePaths = new Set(config.excludePaths ?? ['/health'])
+
+  // Decorate request so downstream routes can access terminal identity
+  app.decorateRequest('terminalIdentity', null)
 
   app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
     // Skip auth for excluded paths
-    if (excludePaths.has(request.url)) {
+    const urlPath = request.url.split('?')[0]
+    if (excludePaths.has(urlPath)) {
       return
     }
 
@@ -151,9 +166,25 @@ export function registerAuth(app: FastifyInstance, config: AuthConfig): void {
     }
 
     const [scheme, token] = authHeader.split(' ')
-    if (scheme !== 'Bearer' || token !== config.token) {
-      reply.code(401).send({ error: 'Invalid token' })
+    if (scheme !== 'Bearer' || !token) {
+      reply.code(401).send({ error: 'Invalid Authorization format' })
       return
     }
+
+    // Mode 1: Global token
+    if (token === config.token) {
+      return
+    }
+
+    // Mode 2: Terminal API Key via TerminalRegistry
+    if (terminalRegistry) {
+      const terminal = terminalRegistry.authenticate(token)
+      if (terminal) {
+        ;(request as any).terminalIdentity = terminal
+        return
+      }
+    }
+
+    reply.code(401).send({ error: 'Invalid token' })
   })
 }

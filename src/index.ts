@@ -48,3 +48,6 @@ export {
 export type { AnomalyReport, CrossValidationResult, SybilDetectionResult } from './security/anti-poisoning.js'
 export { AuditLogger } from './security/audit.js'
 export type { AuditEvent, AuditEventCategory, AuditSeverity, AuditConfig } from './security/audit.js'
+
+// Comment system
+export { CommentBoard } from './core/comment-board.js'

@@ -100,4 +100,81 @@ export function registerTaskRoutes(
     }
     reply.send(task)
   })
+
+  // POST /api/tasks/:id/heartbeat — Task heartbeat (keep-alive for long-running tasks)
+  app.post<{
+    Params: { id: string }
+    Body: { workerId: string; progress?: number; message?: string }
+  }>('/api/tasks/:id/heartbeat', async (request, reply) => {
+    const { id } = request.params
+    const { workerId, progress, message } = request.body
+
+    if (!workerId) {
+      reply.code(400).send({ error: 'Missing required field: workerId' })
+      return
+    }
+
+    const task = taskBoard.getTask(id)
+    if (!task) {
+      reply.code(404).send({ error: 'Task not found' })
+      return
+    }
+
+    if (task.status !== 'claimed' || task.claimedBy !== workerId) {
+      reply.code(409).send({ error: 'Task not claimed by this worker' })
+      return
+    }
+
+    // Update heartbeat timestamp via TaskBoard if method exists, otherwise just ack
+    if (typeof (taskBoard as any).heartbeat === 'function') {
+      ;(taskBoard as any).heartbeat(id, workerId)
+    }
+
+    reply.send({
+      success: true,
+      taskId: id,
+      heartbeatAt: new Date().toISOString(),
+      ...(progress !== undefined && { progress }),
+      ...(message && { message }),
+    })
+  })
+
+  // POST /api/tasks/:id/reject — Reject/release a claimed task
+  app.post<{
+    Params: { id: string }
+    Body: { workerId: string; reason?: string }
+  }>('/api/tasks/:id/reject', async (request, reply) => {
+    const { id } = request.params
+    const { workerId, reason } = request.body
+
+    if (!workerId) {
+      reply.code(400).send({ error: 'Missing required field: workerId' })
+      return
+    }
+
+    const task = taskBoard.getTask(id)
+    if (!task) {
+      reply.code(404).send({ error: 'Task not found' })
+      return
+    }
+
+    if (task.status !== 'claimed' || task.claimedBy !== workerId) {
+      reply.code(409).send({ error: 'Task not claimed by this worker' })
+      return
+    }
+
+    // Release the task back to published state
+    // Note: TaskBoard.reject() is for rejecting submitted results, not releasing claimed tasks.
+    // We directly reset the task state to allow re-claiming.
+    ;(task as any).status = 'published'
+    ;(task as any).claimedBy = undefined
+    ;(task as any).claimedAt = undefined
+
+    reply.send({
+      success: true,
+      taskId: id,
+      releasedBy: workerId,
+      ...(reason && { reason }),
+    })
+  })
 }

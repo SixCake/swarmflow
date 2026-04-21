@@ -3,14 +3,19 @@
 
 import Fastify from 'fastify'
 import type { FastifyInstance } from 'fastify'
-import { registerAuth } from './middleware/auth.js'
+import { registerAuth, TerminalRegistry } from './middleware/auth.js'
 import type { AuthConfig } from './middleware/auth.js'
 import { registerRateLimit } from './middleware/rate-limit.js'
 import type { RateLimitConfig } from './middleware/rate-limit.js'
 import { registerMissionRoutes } from './routes/mission.routes.js'
 import { registerTaskRoutes } from './routes/task.routes.js'
+import { registerTerminalRoutes } from './routes/terminal.routes.js'
+import { registerCommentRoutes } from './routes/comment.routes.js'
+import { registerThreadRoutes } from './routes/thread.routes.js'
 import { MissionManager } from '../core/mission-manager.js'
 import { TaskBoard } from '../core/task-board.js'
+import { DAGEngine } from '../core/dag-engine.js'
+import { CommentBoard } from '../core/comment-board.js'
 
 export interface AppConfig {
   auth?: AuthConfig
@@ -21,6 +26,9 @@ export interface AppConfig {
 export interface AppDependencies {
   missionManager: MissionManager
   taskBoard: TaskBoard
+  terminalRegistry?: TerminalRegistry
+  dagEngine?: DAGEngine
+  commentBoard?: CommentBoard
 }
 
 export async function createApp(
@@ -32,9 +40,16 @@ export async function createApp(
   // Register rate limiting
   await registerRateLimit(app, config.rateLimit)
 
-  // Register auth middleware (if token provided)
+  // Instantiate dependencies
+  const missionManager = deps?.missionManager ?? new MissionManager()
+  const taskBoard = deps?.taskBoard ?? new TaskBoard()
+  const terminalRegistry = deps?.terminalRegistry ?? new TerminalRegistry()
+  const dagEngine = deps?.dagEngine ?? new DAGEngine(taskBoard)
+  const commentBoard = deps?.commentBoard ?? new CommentBoard()
+
+  // Register auth middleware (if token provided) — with terminal registry for dual-mode auth
   if (config.auth?.token) {
-    registerAuth(app, config.auth)
+    registerAuth(app, config.auth, terminalRegistry)
   }
 
   // Health check (always available, no auth)
@@ -43,11 +58,11 @@ export async function createApp(
   })
 
   // Register API routes
-  const missionManager = deps?.missionManager ?? new MissionManager()
-  const taskBoard = deps?.taskBoard ?? new TaskBoard()
-
   registerMissionRoutes(app, missionManager)
   registerTaskRoutes(app, taskBoard)
+  registerTerminalRoutes(app, terminalRegistry)
+  registerCommentRoutes(app, commentBoard)
+  registerThreadRoutes(app, dagEngine)
 
   // Global error handler
   app.setErrorHandler((error, _request, reply) => {
