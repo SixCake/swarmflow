@@ -11,7 +11,7 @@ import { TaskBoard } from './core/task-board.js'
 import { DAGEngine } from './core/dag-engine.js'
 import { MastraExecutor } from './worker/mastra-executor.js'
 import { createApp } from './server/app.js'
-import { mutualIntent, bothAgree, fixedRounds } from './core/convergence.js'
+import { getConvergenceStrategy } from './core/convergence.js'
 
 export interface SwarmFlowConfig {
   port?: number
@@ -283,12 +283,7 @@ export class SwarmFlow {
   }
 
   private resolveConvergencePolicy(policyType: string): ConvergencePolicy {
-    switch (policyType) {
-      case 'mutualIntent': return mutualIntent
-      case 'bothAgree': return bothAgree
-      case 'fixedRounds': return fixedRounds(3)
-      default: return mutualIntent
-    }
+    return getConvergenceStrategy(policyType)
   }
 }
 
