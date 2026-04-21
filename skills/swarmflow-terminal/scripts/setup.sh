@@ -166,6 +166,10 @@ log "Verification: $verified"
 
 # ─── Output JSON ────────────────────────────────────────────
 
+HEARTBEAT_SCRIPT="${SKILL_ROOT}/scripts/heartbeat.sh"
+CRON_CMD="* * * * * /bin/bash ${HEARTBEAT_SCRIPT} >> ~/.swarmflow-heartbeat.log 2>&1"
+LOOP_CMD="nohup bash -c 'while true; do bash \"${HEARTBEAT_SCRIPT}\" >> ~/.swarmflow-heartbeat.log 2>&1; sleep 60; done' &"
+
 jq -n \
   --arg url "$SWARMFLOW_API_URL" \
   --arg key "$API_KEY" \
@@ -174,7 +178,9 @@ jq -n \
   --arg caps "$SWARMFLOW_CAPABILITIES" \
   --arg envFile "$SWARMFLOW_ENV_FILE" \
   --arg verified "$verified" \
-  --arg skillRoot "$SKILL_ROOT" \
+  --arg heartbeat "$HEARTBEAT_SCRIPT" \
+  --arg cronCmd "$CRON_CMD" \
+  --arg loopCmd "$LOOP_CMD" \
   '{
     status: "registered",
     terminalId: $tid,
@@ -184,7 +190,14 @@ jq -n \
     capabilities: ($caps | split(",")),
     envFile: $envFile,
     verified: ($verified == "true"),
-    heartbeatScript: ($skillRoot + "/scripts/heartbeat.sh")
+    heartbeatScript: $heartbeat,
+    nextSteps: {
+      cronJob: "(crontab -l 2>/dev/null | grep -v swarmflow.*heartbeat ; echo \"\($cronCmd)\") | crontab -",
+      backgroundLoop: $loopCmd,
+      verify: ("source " + $envFile + " && bash " + $heartbeat)
+    }
   }'
 
-log "🐝 Setup complete — run heartbeat.sh to start claiming tasks"
+log "🐝 Setup complete"
+log "Next: create a cron job or background loop using the commands in the JSON output above"
+log "Then verify: source ${SWARMFLOW_ENV_FILE} && bash ${HEARTBEAT_SCRIPT}"

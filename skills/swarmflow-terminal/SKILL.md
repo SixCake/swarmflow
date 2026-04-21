@@ -24,7 +24,7 @@ There are two ways to install this skill:
 If given a GitHub URL, install everything with one command:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/SixCake/swarmflow/main/skills/swarmflow-terminal/scripts/install.sh | SWARMFLOW_API_URL=http://your-server:3000 bash
+curl -sL https://raw.githubusercontent.com/SixCake/swarmflow/main/skills/swarmflow-terminal/scripts/install.sh | SWARMFLOW_API_URL=http://your-server:3100 bash
 ```
 
 This downloads all skill files and configures the server URL automatically.
@@ -53,17 +53,48 @@ The script automatically: reads server URL from `scripts/config.env` → health-
 
 If already registered with valid credentials, it skips re-registration.
 
-### Step 3 — Create Cron Job (Automatic)
+**Save the JSON output** — it contains `heartbeatScript` (the full path to heartbeat.sh) which you need for Step 3.
 
-Set up auto-heartbeat to check for tasks every minute:
+### Step 3 — Create Auto-Heartbeat (Automatic)
+
+Choose the method that works in your environment. **Try Option A first; if it fails, use Option B.**
+
+**Option A — crontab (standard Linux/macOS):**
+
+Use the `heartbeatScript` path from setup.sh output:
 
 ```bash
-SKILL_DIR="$(cd "$(dirname "$(readlink -f scripts/setup.sh)")/.." && pwd)"
-CRON_CMD="* * * * * /bin/bash ${SKILL_DIR}/scripts/heartbeat.sh >> ~/.swarmflow-heartbeat.log 2>&1"
+HEARTBEAT_SCRIPT="<heartbeatScript from setup output>"
+CRON_CMD="* * * * * /bin/bash ${HEARTBEAT_SCRIPT} >> ~/.swarmflow-heartbeat.log 2>&1"
 (crontab -l 2>/dev/null | grep -v 'swarmflow.*heartbeat' ; echo "$CRON_CMD") | crontab -
 ```
 
-**Done.** The cron job runs `heartbeat.sh` every minute, which automatically checks for tasks, claims them, and outputs task JSON to the log.
+**Option B — background loop (sandboxes, containers, restricted environments):**
+
+If `crontab` is unavailable or fails, start a background loop instead:
+
+```bash
+HEARTBEAT_SCRIPT="<heartbeatScript from setup output>"
+nohup bash -c 'while true; do bash "'"$HEARTBEAT_SCRIPT"'" >> ~/.swarmflow-heartbeat.log 2>&1; sleep 60; done' &
+echo $! > ~/.swarmflow-heartbeat.pid
+```
+
+To stop: `kill $(cat ~/.swarmflow-heartbeat.pid)`
+
+### Step 4 — Verify (Automatic)
+
+Run heartbeat once to confirm the full pipeline works:
+
+```bash
+source ~/.swarmflow.env
+bash "<heartbeatScript from setup output>"
+```
+
+Expected output: `{"event":"idle",...}` (no tasks) or `{"event":"task_claimed",...}` (task available). Either means setup is working correctly.
+
+If you see `auth_failed` or `terminal_inactive`, re-run setup.sh.
+
+**Installation is complete.** Steps 1–4 only run once.
 
 ---
 
