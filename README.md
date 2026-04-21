@@ -15,6 +15,7 @@ SwarmFlow is an open-source distributed AI Agent task orchestration framework bu
 - **Multi-Phase Workflow** — Supports parallel, interactive (debate), and aggregate phases
 - **6 Convergence Strategies** — mutualIntent, bothAgree, fixedRounds, consensus, stability, hybrid + custom
 - **Aggregation Engine** — Stance clustering (Jaccard + hierarchical), conflict analysis, guidance signals, layered reports
+- **Built-in Dashboard** — Embedded web UI for real-time system monitoring and management, with login authentication and brute-force protection
 - **Security Hardening** — Context sanitization, prompt injection detection, anti-poisoning, audit logging
 - **Hybrid Hub Architecture** — Combines centralized coordination with decentralized execution
 - **No Long-Running Connections** — Stateless REST API enables horizontal scaling
@@ -36,6 +37,11 @@ SwarmFlow is an open-source distributed AI Agent task orchestration framework bu
 ┌─────────────────────────────────────────────────────────────┐
 │                     Execution Layer                          │
 │  Worker Pool · Mastra Executor · Storage · Security         │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│                    Management Layer                          │
+│  Dashboard UI · Login Auth · Rate Limiting · Session Mgmt   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -138,10 +144,21 @@ curl -X POST http://localhost:3000/tasks/task-1/submit \
 | `generateReport()` | Layered report generation (5 layers, no LLM) |
 | `renderReportMarkdown()` | Render report as Markdown |
 
+### Dashboard
+
+| Route | Description |
+|-------|-------------|
+| `GET /dashboard` | Dashboard web UI (requires login) |
+| `GET /dashboard/login` | Login page |
+| `POST /dashboard/login` | Authenticate (username + password) |
+| `POST /dashboard/logout` | Destroy session |
+| `GET /dashboard/api/*` | Dashboard data APIs (requires session) |
+
 ### Security Modules
 
 | Module | Description |
 |--------|-------------|
+| `dashboard-auth` | Dashboard login with scrypt hashing, session cookies, IP rate limiting, brute-force lockout |
 | `context-security` | PII removal, API key redaction, Unicode watermarking |
 | `prompt-defense` | Injection detection, instruction isolation, output safety |
 | `anti-poisoning` | Stance outliers, Sybil detection, cross-validation |
@@ -154,12 +171,64 @@ curl -X POST http://localhost:3000/tasks/task-1/submit \
 | `MemoryStorage` | In-memory (default, for development) |
 | `FileStorage` | JSON file persistence (for small deployments) |
 
+## Dashboard
+
+SwarmFlow includes a built-in web dashboard for real-time system monitoring and management. Access it at `http://localhost:<port>/dashboard` after starting the server.
+
+### Features
+
+- **System Overview** — Key metrics (missions, tasks, terminals, threads), task pipeline visualization, recent activity
+- **Mission Management** — View all missions with status, phases, agents, and convergence policy
+- **Task Monitoring** — Real-time task lifecycle tracking (published → claimed → submitted → verified), failure detection
+- **Terminal Management** — Registered worker terminals, active status, capabilities
+- **Thread & Discussion** — Interactive discussion threads, round progress, convergence status
+
+### Authentication & Security
+
+The dashboard requires username/password authentication with built-in brute-force protection:
+
+- **Password hashing** — `crypto.scrypt` (N=16384, 32-byte salt, 64-byte key) with timing-safe comparison
+- **Session management** — Cryptographically random tokens, HttpOnly + SameSite=Strict cookies, configurable TTL
+- **IP rate limiting** — Sliding window (default: 5 attempts per 60 seconds)
+- **IP lockout** — Automatic lockout after exceeding max attempts (default: 5 minutes)
+- **Zero extra dependencies** — Uses only Node.js built-in `crypto` module
+
+### Dashboard Configuration
+
+```typescript
+const swarm = new SwarmFlow({
+  port: 3000,
+  authToken: 'my-secret-token',
+  dashboardAuth: {
+    username: 'admin',                // Dashboard login username
+    password: 'your-secure-password', // Dashboard login password
+    sessionTtlSeconds: 14400,         // Session duration (default: 4 hours)
+    maxLoginAttempts: 5,              // Max attempts per IP per window
+    rateLimitWindowSeconds: 60,       // Rate limit window
+    lockoutDurationSeconds: 300,      // IP lockout duration (default: 5 min)
+  },
+})
+```
+
+Or via environment variables:
+
+```bash
+SWARMFLOW_DASH_USER=admin
+SWARMFLOW_DASH_PASS=your-secure-password
+```
+
+> **Note:** If `dashboardAuth` is not provided, the dashboard endpoint returns `503 Service Unavailable`.
+
 ## Configuration
 
 ```typescript
 const swarm = new SwarmFlow({
   port: 3000,                    // HTTP server port
   authToken: 'my-secret-token',  // Bearer token for API auth
+  dashboardAuth: {               // Dashboard admin credentials (optional)
+    username: 'admin',
+    password: 'your-secure-password',
+  },
 })
 ```
 
