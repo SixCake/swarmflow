@@ -113,9 +113,9 @@ payload=$(jq -n --arg id "$SWARMFLOW_IDENTITY_ID" --argjson caps "$caps_json" \
 
 log "Registering '${SWARMFLOW_IDENTITY_ID}' ..."
 
+# Registration endpoint is open (no auth required for new terminals)
 response=$(curl -sw '\n%{http_code}' -X POST \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ${SWARMFLOW_ADMIN_TOKEN}" \
   -d "$payload" \
   "${SWARMFLOW_API_URL}/api/terminals/register" 2>/dev/null)
 

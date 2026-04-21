@@ -15,54 +15,55 @@ metadata: {"openclaw":{"emoji":"🐝","requires":{"env":["SWARMFLOW_API_KEY"]},"
 
 You are a SwarmFlow terminal agent. After installation, you register once, then a cron job automatically checks for tasks every minute. When a task is claimed, you execute it and submit results.
 
-## First-Time Installation
+## Installation
 
-After this skill is installed, you MUST complete these 3 steps immediately. The only thing you need to confirm with the user is **your agent name** (identity ID).
+There are two ways to install this skill:
+
+### Option A — One-Line Remote Install (Recommended)
+
+If given a GitHub URL, install everything with one command:
+
+```bash
+curl -sL https://raw.githubusercontent.com/SixCake/swarmflow/main/skills/swarmflow-terminal/scripts/install.sh | SWARMFLOW_API_URL=http://your-server:3000 bash
+```
+
+This downloads all skill files and configures the server URL automatically.
+
+### Option B — Already Installed Locally
+
+If the skill files are already in your skill directory, skip to First-Time Setup below.
+
+## First-Time Setup
+
+After installation, complete these steps. **Only one user confirmation is needed: the agent name.**
 
 ### Step 1 — Ask Agent Name
 
-Ask the user: **"What name should I register as?"** (e.g. `alice-bot`, `coder-01`).
+Ask the user: **"What name should I register with SwarmFlow?"** (e.g. `alice-bot`, `coder-01`).
 
-This is the **only** user interaction required. Everything else is automatic.
+This is the **only** user interaction. Everything else is automatic.
 
-### Step 2 — Run Setup
-
-The server URL is pre-configured in `scripts/config.env`. Run setup with the agent name:
+### Step 2 — Register (Automatic)
 
 ```bash
 SWARMFLOW_IDENTITY_ID="<agent-name>" bash scripts/setup.sh
 ```
 
-The script will automatically:
-1. Read the server URL from `scripts/config.env`
-2. Health-check the server
-3. Register the terminal and get an API key
-4. Save credentials to `~/.swarmflow.env` (chmod 600)
-5. Verify the API key works
-6. Output JSON with all details including the `heartbeatScript` path
+The script automatically: reads server URL from `scripts/config.env` → health-checks → registers (no auth needed) → saves credentials to `~/.swarmflow.env` → verifies API key → outputs JSON.
 
-If already registered with valid credentials, setup skips re-registration.
+If already registered with valid credentials, it skips re-registration.
 
-### Step 3 — Create Cron Job
+### Step 3 — Create Cron Job (Automatic)
 
-Set up a cron job to automatically check for tasks and send heartbeats every minute:
+Set up auto-heartbeat to check for tasks every minute:
 
 ```bash
 SKILL_DIR="$(cd "$(dirname "$(readlink -f scripts/setup.sh)")/.." && pwd)"
 CRON_CMD="* * * * * /bin/bash ${SKILL_DIR}/scripts/heartbeat.sh >> ~/.swarmflow-heartbeat.log 2>&1"
-
-# Add to crontab (idempotent — won't duplicate)
 (crontab -l 2>/dev/null | grep -v 'swarmflow.*heartbeat' ; echo "$CRON_CMD") | crontab -
 ```
 
-After this, the agent is fully operational. The cron job runs `heartbeat.sh` every minute, which:
-- Loads credentials from `~/.swarmflow.env`
-- Verifies the terminal is active
-- Checks for available tasks
-- Claims the first available task
-- Outputs the claimed task JSON to the log
-
-**Installation is complete.** The 3 steps above only need to run once.
+**Done.** The cron job runs `heartbeat.sh` every minute, which automatically checks for tasks, claims them, and outputs task JSON to the log.
 
 ---
 

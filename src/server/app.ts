@@ -53,11 +53,11 @@ export async function createApp(
 
   // Register auth middleware (if token provided) — with terminal registry for dual-mode auth
   if (config.auth?.token) {
-    const dashboardExcludes = ['/health', '/dashboard']
+    const defaultExcludes = ['/health', '/dashboard', '/api/terminals/register']
     const existingExcludes = config.auth.excludePaths ?? []
     registerAuth(app, {
       ...config.auth,
-      excludePaths: [...new Set([...existingExcludes, ...dashboardExcludes])],
+      excludePaths: [...new Set([...existingExcludes, ...defaultExcludes])],
     }, terminalRegistry)
   }
 
